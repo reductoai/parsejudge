@@ -1,6 +1,6 @@
 /** Pure shaping of run results for MCP tools: filters, sorting and cursors over pages and errors. */
 
-const SEVERITY_RANK: Record<string, number> = { high: 0, figure_error: 1, medium: 2, low: 3, not_error: 4 };
+const SEVERITY_RANK: Record<string, number> = { high: 0, figure_error: 1, medium: 2, low: 3 };
 
 export interface PageScore {
   readonly presetId: string;
@@ -108,7 +108,6 @@ export const flattenErrors = (rows: ReadonlyArray<RunErrorRow>, q: ErrorQuery): 
     )
     .filter(
       (error) =>
-        error.severity !== "not_error" &&
         (q.severities === undefined || q.severities.includes(error.severity)) &&
         (q.categories === undefined || q.categories.includes(error.category)),
     );

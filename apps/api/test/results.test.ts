@@ -69,10 +69,7 @@ describe("flattenErrors", () => {
       presetId: "r1",
       score: 4,
       reasoning: "bad",
-      errors: [
-        { severity: "high", category: "table_structure", description: "merged columns" },
-        { severity: "not_error", category: "text_corruption", description: "style only" },
-      ],
+      errors: [{ severity: "high", category: "table_structure", description: "merged columns" }],
     },
     {
       pageId: "p2",
@@ -85,7 +82,7 @@ describe("flattenErrors", () => {
     },
   ];
 
-  it("returns one entry per error, most severe and lowest score first, without not_error", () => {
+  it("returns one entry per error, most severe and lowest score first", () => {
     const errors = flattenErrors(errorRows, {});
     expect(errors.map((e) => `${e.presetId}:${e.description}`)).toEqual(["r1:merged columns", "tx:missing row", "r1:typo"]);
     expect(errors[2]?.quotes).toEqual(["teh"]);

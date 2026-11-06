@@ -38,7 +38,7 @@ interface PageSort {
 
 const FLAG_GAP = 3;
 const BLOCKS = "p,li,td,th,h1,h2,h3,h4,h5,h6,blockquote,pre";
-const RANK: Record<Severity, number> = { high: 0, figure_error: 1, medium: 2, low: 3, not_error: 4 };
+const RANK: Record<Severity, number> = { high: 0, figure_error: 1, medium: 2, low: 3 };
 
 const isFlagged = (page: PageStat) => page.failed || page.gap >= FLAG_GAP || page.high > 0;
 const FILTERS: ReadonlyArray<readonly [PageFilter, string]> = [
@@ -58,8 +58,7 @@ const bySort =
   (a: PageStat, b: PageStat) =>
     (sortValue(a, key) - sortValue(b, key)) * (desc ? -1 : 1) || a.order - b.order;
 const byScore = (a: PageParse, b: PageParse) => (b.score ?? -1) - (a.score ?? -1);
-const flagsOf = (parse: PageParse) =>
-  (parse.errors ?? []).filter((e) => e.severity !== "not_error").sort((a, b) => RANK[a.severity] - RANK[b.severity]);
+const flagsOf = (parse: PageParse) => [...(parse.errors ?? [])].sort((a, b) => RANK[a.severity] - RANK[b.severity]);
 const pageUrl = (shareId: string, pageId: string, view: View) => `/r/${shareId}/p/${pageId}${view === "all" ? "?view=all" : ""}`;
 
 const pageStats = (run: Run): ReadonlyArray<PageStat> => {

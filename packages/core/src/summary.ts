@@ -97,7 +97,7 @@ const summarizePreset = (presetId: string, results: ReadonlyArray<PageResult>, s
   const withHigh = verdicts.filter((verdict) => verdict.errors.some((error) => error.severity === "high")).length;
   const errorCounts: Partial<Record<ErrorCategory, number>> = {};
   for (const error of verdicts.flatMap((verdict) => verdict.errors)) {
-    if (error.severity !== "not_error") errorCounts[error.category] = (errorCounts[error.category] ?? 0) + 1;
+    errorCounts[error.category] = (errorCounts[error.category] ?? 0) + 1;
   }
   const latencies = results.flatMap((result) => (result.latencyMs === undefined ? [] : [result.latencyMs]));
   return {
