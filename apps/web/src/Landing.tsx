@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, auth, currentUser, DRAFT_KEY, type Draft, type Preset, type RunListItem } from "./api.ts";
 import { Icon } from "./ax/Icon.tsx";
 import { Go, Shell, SiteBar, SiteFoot } from "./Nav.tsx";
-import { BYOK_KEY, PROVIDER_ORDER, providerName, shortName } from "./names.ts";
+import { BYOK_KEY, providerName, providerRank, shortName } from "./names.ts";
 import { navigate } from "./router.ts";
 import { SignIn } from "./SignIn.tsx";
 
@@ -367,7 +367,7 @@ export const Landing = ({ zdr }: { readonly zdr: boolean }) => {
   const groups = useMemo(() => {
     const byProvider = new Map<string, Preset[]>();
     for (const p of presets) byProvider.set(p.provider, [...(byProvider.get(p.provider) ?? []), p]);
-    const entries = [...byProvider.entries()].sort(([a], [b]) => PROVIDER_ORDER.indexOf(a) - PROVIDER_ORDER.indexOf(b));
+    const entries = [...byProvider.entries()].sort(([a], [b]) => providerRank(a) - providerRank(b));
     return {
       included: entries.filter(([, ps]) => ps.some((p) => p.hosted)),
       byok: entries.filter(([, ps]) => !ps.some((p) => p.hosted)),

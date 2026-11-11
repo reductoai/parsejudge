@@ -1,7 +1,7 @@
 import type { OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { DEFAULT_PRESET_IDS, PRESETS, PROVIDERS } from "@parsejudge/core";
+import { adapterFor, DEFAULT_PRESET_IDS, PRESETS } from "@parsejudge/core";
 import { Cause, Data, Duration, Effect } from "effect";
 import { FetchHttpClient, HttpClient, type HttpClientError } from "effect/http";
 import * as z from "zod";
@@ -147,7 +147,7 @@ const buildServer = (env: Env, userId: string, oauth: OAuthHelpers) => {
           listPriceUsdPer1kPages: Math.round(preset.listPriceUsdPerPage * 1000 * 100) / 100,
           hosted: preset.hosted,
           default: DEFAULT_PRESET_IDS.includes(preset.id),
-          credentialKeys: preset.hosted ? [] : PROVIDERS[preset.provider].credentialKeys,
+          credentialKeys: preset.hosted ? [] : adapterFor(preset.provider).credentialKeys,
         })),
       ),
     ),
@@ -242,7 +242,7 @@ const buildServer = (env: Env, userId: string, oauth: OAuthHelpers) => {
       const preset = PRESETS.find((p) => p.id === id);
       if (preset === undefined) return yield* new ApiError({ message: `Unknown preset ${id}. Call list_providers for the ids.` });
       if (preset.hosted) continue;
-      const missing = PROVIDERS[preset.provider].credentialKeys.filter((key) => !args.credentials?.[preset.provider]?.[key]);
+      const missing = adapterFor(preset.provider).credentialKeys.filter((key) => !args.credentials?.[preset.provider]?.[key]);
       if (missing.length > 0) {
         return yield* new ApiError({ message: `${preset.label} needs credentials.${preset.provider}: ${missing.join(", ")}.` });
       }

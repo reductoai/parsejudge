@@ -1,6 +1,6 @@
 import { Effect, type Option } from "effect";
 import type { HttpClient } from "effect/http";
-import type { Cost, ProviderId } from "./domain.ts";
+import type { Cost } from "./domain.ts";
 import { ProviderError } from "./errors.ts";
 
 /** One page rendered to PNG. Every provider gets the same image, whatever the source format. The URL is short-lived and public. */
@@ -32,7 +32,7 @@ export type Credentials = Readonly<Record<string, string>>;
 export type ProviderConfig = Readonly<Record<string, unknown>>;
 
 export interface ProviderAdapter {
-  readonly id: ProviderId;
+  readonly id: string;
   /** Credential names the adapter reads, e.g. `AZURE_DI_KEY`. */
   readonly credentialKeys: ReadonlyArray<string>;
   /** Most requests in flight per API key. Defaults to `DEFAULT_MAX_CONCURRENCY`. */
@@ -49,14 +49,14 @@ export interface ProviderAdapter {
   ) => Effect.Effect<Option.Option<ParseOutput>, ProviderError, HttpClient.HttpClient>;
 }
 
-export const credential = (provider: ProviderId, credentials: Credentials, key: string) => {
+export const credential = (provider: string, credentials: Credentials, key: string) => {
   const value = credentials[key];
   return value === undefined || value.length === 0
     ? Effect.fail(new ProviderError({ provider, retryable: false, message: `Missing credential ${key}` }))
     : Effect.succeed(value);
 };
 
-export const failure = (provider: ProviderId, message: string, retryable = false) =>
+export const failure = (provider: string, message: string, retryable = false) =>
   new ProviderError({ provider, retryable, message });
 
 /**
@@ -64,5 +64,5 @@ export const failure = (provider: ProviderId, message: string, retryable = false
  * job again returns the same answer. The message keeps the provider's error text but not the body, which can hold
  * document content.
  */
-export const jobFailure = (provider: ProviderId, status: string, error: string | null | undefined) =>
+export const jobFailure = (provider: string, status: string, error: string | null | undefined) =>
   failure(provider, `job ${status}: ${error ?? "no error message"}`);

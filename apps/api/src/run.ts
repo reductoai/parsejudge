@@ -1,5 +1,6 @@
 import { NonRetryableError } from "cloudflare:workflows";
 import {
+  adapterFor,
   type Credentials,
   DEFAULT_MAX_CONCURRENCY,
   decodeJson,
@@ -7,8 +8,6 @@ import {
   type PageInput,
   type PageResult,
   type ParseOutput,
-  PROVIDERS,
-  type ProviderError,
   summarize,
 } from "@parsejudge/core";
 import { Data, Effect, Layer, Option } from "effect";
@@ -72,7 +71,7 @@ export const credentialsFor = Effect.fn("credentialsFor")(function* (env: Env, r
   if (row !== null) return yield* decryptCredentials(env.CREDENTIALS_KEY, runId, row.iv, row.ciphertext);
   if (!preset.hosted) return yield* new StepRejected({ message: `${preset.label} needs your own API key` });
   const hosted: Record<string, string> = {};
-  for (const key of PROVIDERS[preset.provider].credentialKeys) {
+  for (const key of adapterFor(preset.provider).credentialKeys) {
     const value = env[key];
     if (typeof value === "string") hosted[key] = value;
   }
@@ -155,7 +154,7 @@ export const submitCell = Effect.fn("submitCell")(function* (env: Env, cell: Cel
   const credentials = yield* credentialsFor(env, cell.runId, cell.presetId);
   const page = yield* pageInput(env, cell.pageId);
   const startedAt = Date.now();
-  const submission = yield* PROVIDERS[preset.provider].submit(page, preset.config, credentials);
+  const submission = yield* adapterFor(preset.provider).submit(page, preset.config, credentials);
   if (submission._tag === "Pending") return { job: submission.job, startedAt };
   yield* saveParse(env, cell, submission.output, Date.now() - startedAt, queueMs);
   return { job: null, startedAt };
@@ -164,7 +163,7 @@ export const submitCell = Effect.fn("submitCell")(function* (env: Env, cell: Cel
 /** Returns true when the vendor job finished and the result is stored. */
 export const pollCell = Effect.fn("pollCell")(function* (env: Env, cell: Cell, job: string, startedAt: number, queueMs: number) {
   const preset = findPreset(cell.presetId);
-  const poll = preset === undefined ? undefined : PROVIDERS[preset.provider].poll;
+  const poll = preset === undefined ? undefined : adapterFor(preset.provider).poll;
   if (preset === undefined || poll === undefined) return yield* new StepRejected({ message: `${cell.presetId} cannot poll` });
   const credentials = yield* credentialsFor(env, cell.runId, cell.presetId);
   const output = yield* poll(job, credentials);
@@ -205,7 +204,7 @@ const fingerprint = (credentials: Credentials) => {
 export const providerPool = Effect.fn("providerPool")(function* (env: Env, cell: Cell) {
   const preset = findPreset(cell.presetId);
   if (preset === undefined) return yield* new StepRejected({ message: `Unknown preset ${cell.presetId}` });
-  const adapter = PROVIDERS[preset.provider];
+  const adapter = adapterFor(preset.provider);
   const credentials = yield* credentialsFor(env, cell.runId, cell.presetId);
   const pool: Pool = {
     name: `${preset.provider}:${yield* fingerprint(credentials)}`,

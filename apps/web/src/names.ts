@@ -29,12 +29,14 @@ export const BYOK_KEY: Record<string, string> = {
   cohere: "COHERE_API_KEY",
 };
 
-export const providerName = (id: string) => PROVIDER_NAMES[id] ?? id;
-export const shortName = (id: string) => SHORT_NAMES[id] ?? id;
+/** `bedrock_data_automation` -> `Bedrock Data Automation`, for providers this build has no name for. */
+const titleCase = (id: string) => id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+export const providerName = (id: string) => PROVIDER_NAMES[id] ?? titleCase(id);
+export const shortName = (id: string) => SHORT_NAMES[id] ?? titleCase(id);
 export const perThousand = (usdPerPage: number) => `$${Math.round(usdPerPage * 1000)}`;
 export const seconds = (ms: number | null) => (ms === null ? "–" : `${(ms / 1000).toFixed(1)} s`);
 
-/** Display order on the landing page. */
+/** Display order on the landing page. Providers not listed go last. */
 export const PROVIDER_ORDER = [
   "reducto",
   "azure_document_intelligence",
@@ -47,6 +49,10 @@ export const PROVIDER_ORDER = [
   "pulse",
   "cohere",
 ];
+export const providerRank = (id: string) => {
+  const rank = PROVIDER_ORDER.indexOf(id);
+  return rank === -1 ? PROVIDER_ORDER.length : rank;
+};
 
 const TONES = ["slate", "rust", "pine", "honey", "espresso", "ink"];
 

@@ -3,7 +3,7 @@ import { Effect, Exit, Layer, Option } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { describe, expect, it } from "vitest";
 import type { Credentials, PageInput } from "../src/provider.ts";
-import { PROVIDERS } from "../src/providers/index.ts";
+import { adapterFor, PROVIDERS } from "../src/providers/index.ts";
 
 const page: PageInput = { imageUrl: "https://pages.test/p.png", image: Effect.succeed(new Uint8Array([1])) };
 const credentials: Credentials = {
@@ -26,8 +26,8 @@ const run = <A, E>(effect: Effect.Effect<A, E, import("effect/http").HttpClient.
 
 const json = (body: unknown) => () => new Response(JSON.stringify(body), { status: 200 });
 
-const poll = (provider: keyof typeof PROVIDERS, body: unknown) => {
-  const adapter = PROVIDERS[provider];
+const poll = (provider: string, body: unknown) => {
+  const adapter = adapterFor(provider);
   if (adapter.poll === undefined) throw new Error(`${provider} cannot poll`);
   return run(adapter.poll("https://jobs.test/job-1", credentials), json(body));
 };

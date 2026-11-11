@@ -1,4 +1,4 @@
-import type { ProviderId } from "./domain.ts";
+import { plugins } from "#plugins";
 import type { ProviderConfig } from "./provider.ts";
 
 /**
@@ -9,7 +9,7 @@ import type { ProviderConfig } from "./provider.ts";
  */
 export interface Preset {
   readonly id: string;
-  readonly provider: ProviderId;
+  readonly provider: string;
   readonly label: string;
   /** The option within the provider, e.g. "Agentic Plus". */
   readonly mode: string;
@@ -27,7 +27,7 @@ const datalab = (mode: string): ProviderConfig => ({
   additional_config: { keep_pageheader_in_output: true, keep_pagefooter_in_output: true },
 });
 
-export const PRESETS: ReadonlyArray<Preset> = [
+const BUILTIN_PRESETS: ReadonlyArray<Preset> = [
   {
     id: "reducto_r1",
     provider: "reducto",
@@ -197,6 +197,8 @@ export const PRESETS: ReadonlyArray<Preset> = [
     hosted: false,
   },
 ];
+
+export const PRESETS: ReadonlyArray<Preset> = [...BUILTIN_PRESETS, ...plugins.flatMap((plugin) => plugin.presets)];
 
 export const DEFAULT_PRESET_IDS: ReadonlyArray<string> = PRESETS.filter((preset) => preset.hosted && !preset.optIn).map(
   (preset) => preset.id,

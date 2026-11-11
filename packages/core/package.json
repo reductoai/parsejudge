@@ -6,6 +6,9 @@
     ".": "./src/index.ts",
     "./*": "./src/*.ts"
   },
+  "imports": {
+    "#plugins": "./src/plugins.ts"
+  },
   "scripts": {
     "check": "tsc -p . && tsc -p test",
     "test": "vitest run"

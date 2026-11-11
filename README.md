@@ -42,7 +42,9 @@ for every page. The prompt and scoring code are in this repo.
 | Cohere                      | Parse v5                              | bring your own key |
 
 `GET /v1/presets` returns the full list with list prices. To add a provider, add an adapter in
-`packages/core/src/providers` and a preset in `packages/core/src/presets.ts`.
+`packages/core/src/providers` and a preset in `packages/core/src/presets.ts`. A self-hosted build can add
+providers without editing this repo: bundle the Worker with `#plugins` aliased to a module that exports
+`plugins: ReadonlyArray<Plugin>` (see `packages/core/src/plugins.ts`).
 
 ![Parse Judge upload page: drop PDF, DOCX or PPTX files and pick which document parsers to compare](.github/assets/landing.webp)
 
