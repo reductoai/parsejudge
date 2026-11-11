@@ -44,6 +44,25 @@ describe("readFrames", () => {
     expect(got).toEqual(pages);
   });
 
+  it("reads large pages that arrive in many small chunks", async () => {
+    const large = [new Uint8Array(3 * 1024 * 1024).map((_, i) => i % 251), new Uint8Array(7), new Uint8Array(65_537).fill(9)];
+    for (const size of [997, 64 * 1024]) {
+      const got: Array<Uint8Array> = [];
+      const count = await Effect.runPromise(
+        readFrames(chunked(encode(large), size), (_, page) =>
+          Effect.sync(() => {
+            got.push(page);
+          }),
+        ),
+      );
+      expect(count).toBe(3);
+      // Lengths and a checksum, not the bytes: deep-comparing megabytes of Uint8Array is very slow.
+      expect(got.map((p) => [p.length, p.reduce((sum, b) => (sum * 31 + b) % 1_000_003, 0)])).toEqual(
+        large.map((p) => [p.length, p.reduce((sum, b) => (sum * 31 + b) % 1_000_003, 0)]),
+      );
+    }
+  });
+
   it("fails when the body ends inside a page", async () => {
     const body = encode(pages).slice(0, 20);
     const error = await Effect.runPromise(Effect.flip(readFrames(chunked(body, 7), () => Effect.void)));

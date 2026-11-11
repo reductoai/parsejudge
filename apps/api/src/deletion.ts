@@ -24,15 +24,16 @@ const removePrefix = Effect.fn("removePrefix")(function* (blobs: R2Bucket, prefi
 
 const documentBlobs = Effect.fn("documentBlobs")(function* (env: Env, documentsSql: string, bind: string) {
   const docs = yield* storage(() =>
-    env.DB.prepare(`SELECT id, format FROM documents WHERE id IN (${documentsSql})`)
+    env.DB.prepare(`SELECT id, format, source_key, pdf_key FROM documents WHERE id IN (${documentsSql})`)
       .bind(bind)
-      .all<{ id: string; format: string }>(),
+      .all<{ id: string; format: string; source_key: string | null; pdf_key: string | null }>(),
   );
   const pages = yield* storage(() =>
     env.DB.prepare(`SELECT id FROM pages WHERE document_id IN (${documentsSql})`).bind(bind).all<{ id: string }>(),
   );
   return [
-    ...docs.results.flatMap((d) => [sourceKey(d.id, d.format), documentKey(d.id)]),
+    // Older documents have no recorded keys. A PDF's pdf_key is its source_key; deleting a key twice is harmless.
+    ...docs.results.flatMap((d) => [d.source_key ?? sourceKey(d.id, d.format), d.pdf_key ?? documentKey(d.id)]),
     ...pages.results.flatMap((p) => [pagePdfKey(p.id), pagePngKey(p.id)]),
   ];
 });

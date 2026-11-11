@@ -37,14 +37,24 @@ const signedUpload = Effect.fn("signedUpload")(function* (request: Request, env:
   if (upload === null) return jsonError(403, "This upload URL is invalid or expired.");
   const filename = decodedName ?? new URL(request.url).searchParams.get("filename");
   const query = new URLSearchParams({ filename: filename ?? "document", upload: upload.uploadId });
-  const body = yield* Effect.tryPromise(() => request.arrayBuffer()).pipe(Effect.orElseSucceed(() => null));
-  if (body === null) return jsonError(400, "Could not read the request body.");
+  // The body streams through to R2, which needs its length up front.
+  const length = request.headers.get("content-length");
+  if (request.body === null || length === null) {
+    return Response.json(
+      { filename, error: "Send the file as the request body, with a content-length header." },
+      { status: 411 },
+    );
+  }
   const response = yield* Effect.promise(() =>
     handler(
       new Request(new URL(`/v1/documents?${query}`, request.url), {
         method: "POST",
-        headers: { [INTERNAL_HEADER]: internalHeader(upload.userId), "content-type": "application/octet-stream" },
-        body,
+        headers: {
+          [INTERNAL_HEADER]: internalHeader(upload.userId),
+          "content-type": "application/octet-stream",
+          "content-length": length,
+        },
+        body: request.body,
       }),
     ),
   );

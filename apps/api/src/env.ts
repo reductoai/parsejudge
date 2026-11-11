@@ -34,6 +34,8 @@ export interface Env {
   readonly MAX_PAGES_PER_RUN: string;
   /** Pages one user can start runs on in any 24 hours. Unset turns it off. */
   readonly MAX_PAGES_PER_DAY?: string;
+  /** Largest upload accepted, in bytes. Unset turns it off (Cloudflare's request body limit still applies). */
+  readonly MAX_UPLOAD_BYTES?: string;
   /** JSON map from provider id or "judge" to max requests in flight per API key, e.g. `{"reducto": 200}`. */
   readonly MAX_CONCURRENCY?: string;
   readonly BLOB_SIGNING_KEY: string;
@@ -70,6 +72,7 @@ export const EnvVars = Schema.Struct({
   JUDGE_REASONING_EFFORT: Schema.Literals(["low", "medium", "high"]),
   MAX_PAGES_PER_RUN: positiveInt,
   MAX_PAGES_PER_DAY: Schema.optional(positiveInt),
+  MAX_UPLOAD_BYTES: Schema.optional(positiveInt),
   MAX_CONCURRENCY: Schema.optional(
     Schema.fromJsonString(Schema.Record(Schema.String, Schema.Int.check(Schema.isGreaterThan(0)))),
   ),

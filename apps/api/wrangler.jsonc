@@ -34,6 +34,7 @@
     "JUDGE_REASONING_EFFORT": "medium",
     "MAX_PAGES_PER_RUN": "1000",
     "MAX_PAGES_PER_DAY": "10000",
+    "MAX_UPLOAD_BYTES": "268435456",
     "MAX_CONCURRENCY": "{}",
     "AWS_REGION": "us-west-2",
     "AUTH_MODE": "email",
