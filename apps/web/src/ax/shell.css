@@ -412,9 +412,14 @@
 .pjx .site-foot {
   display: flex;
   gap: 16px;
-  padding: 24px 0 40px;
+  padding: 24px 32px 40px;
   border-top: 0.5px solid var(--grey-200);
   font-size: 13px;
+}
+@media (max-width: 640px) {
+  .pjx .site-foot {
+    padding-inline: 20px;
+  }
 }
 .pjx .site-foot a {
   color: var(--grey-400);
