@@ -57,7 +57,7 @@ const svgEl = (tag: string, attrs: Record<string, string | number>, parent?: Ele
   return el;
 };
 const docShort = (d: string) => d.replace(/\.[^.]+$/i, "");
-const SEV_RANK: Record<string, number> = { high: 0, medium: 1, low: 2, not_error: 3 };
+const SEV_RANK: Record<string, number> = { high: 0, figure_error: 1, medium: 2, low: 3 };
 const category = (c: string) => {
   const s = c.replace(/_/g, " ");
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -1034,10 +1034,7 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
           .map((e) => {
             const s = score(pg, e.id);
             const parse = d?.parses.find((p) => p.presetId === e.id);
-            const errs = (parse?.errors ?? [])
-              .filter((x) => x.severity !== "not_error")
-              .slice()
-              .sort((a, b) => (SEV_RANK[a.severity] ?? 3) - (SEV_RANK[b.severity] ?? 3));
+            const errs = (parse?.errors ?? []).slice().sort((a, b) => (SEV_RANK[a.severity] ?? 3) - (SEV_RANK[b.severity] ?? 3));
             const items = [
               ...(parse?.warning ? [`<li><span><span class="c hi">Cut off · </span>${esc(parse.warning)}</span></li>`] : []),
               ...errs

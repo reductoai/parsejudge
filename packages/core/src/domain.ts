@@ -20,7 +20,8 @@ export type CostSource = typeof CostSource.Type;
 export const Cost = Schema.Struct({ usd: Schema.Number, source: CostSource });
 export type Cost = typeof Cost.Type;
 
-export const Severity = Schema.Literals(["not_error", "low", "medium", "high", "figure_error"]);
+/** The judge returns high, low or figure_error; medium only appears in verdicts stored before compare-v4. */
+export const Severity = Schema.Literals(["low", "medium", "high", "figure_error"]);
 export type Severity = typeof Severity.Type;
 
 export const ErrorCategory = Schema.Literals([

@@ -88,29 +88,29 @@ const Steps = ({ items, active }: { readonly items: ReadonlyArray<string>; reado
 
 const PARSERS = ["parser_1", "parser_2", "parser_3"] as const;
 const PAGES = ["page_0001", "page_0002", "page_0003", "page_0004"] as const;
-type Severity = "high" | "medium" | "low";
+type Severity = "high" | "low";
 const VERDICTS: Record<
   (typeof PAGES)[number],
   ReadonlyArray<{ readonly score: number; readonly errors: ReadonlyArray<Severity> }>
 > = {
   page_0001: [
     { score: 9, errors: ["low"] },
-    { score: 6, errors: ["high", "medium"] },
-    { score: 8, errors: ["medium"] },
+    { score: 6, errors: ["high", "low"] },
+    { score: 9, errors: ["low", "low"] },
   ],
   page_0002: [
     { score: 10, errors: [] },
     { score: 9, errors: ["low"] },
-    { score: 4, errors: ["high", "high", "medium"] },
+    { score: 4, errors: ["high", "high", "low"] },
   ],
   page_0003: [
-    { score: 7, errors: ["medium", "medium"] },
-    { score: 8, errors: ["medium", "low"] },
+    { score: 9, errors: ["low", "low"] },
+    { score: 6, errors: ["high", "low"] },
     { score: 7, errors: ["high"] },
   ],
   page_0004: [
     { score: 9, errors: ["low", "low"] },
-    { score: 5, errors: ["high", "medium", "low"] },
+    { score: 5, errors: ["high", "low", "low"] },
     { score: 9, errors: ["low"] },
   ],
 };
@@ -156,8 +156,7 @@ const Marks = ({ x, y, errors }: { x: number; y: number; errors: ReadonlyArray<S
         width={7}
         height={7}
         rx={1}
-        fill={s === "high" ? "var(--bad)" : s === "medium" ? "#fff" : "#d4d4d4"}
-        stroke={s === "high" ? "var(--bad)" : s === "medium" ? "var(--ink)" : "#d4d4d4"}
+        fill={s === "high" ? "var(--bad)" : "#d4d4d4"}
       />
     ))}
   </g>
@@ -201,8 +200,8 @@ export const BlindRequestFigure = () => {
         <>
           Each page is one judge request, and every parser gets the same page image. Outputs are relabeled <code>parse_a</code>,{" "}
           <code>parse_b</code>, … in an order set by <code>sha256(page_id:parser_id)</code>, so the order changes from page to
-          page but can be reproduced. The judge lists errors (red: high, outlined: medium, grey: low), then scores each label.
-          Names are put back only after the response.
+          page but can be reproduced. The judge lists errors (red: high, grey: low), then scores each label. Names are put back
+          only after the response.
         </>
       }
     >

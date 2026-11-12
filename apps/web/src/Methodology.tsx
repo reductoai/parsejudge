@@ -186,12 +186,6 @@ export const Methodology = () => {
                   <span className="tag low">low</span>
                 </dt>
                 <dd>Local and superficial, such as punctuation, spacing or an obvious typo. The right reading is still clear.</dd>
-                <dt>
-                  <span className="tag">figure_error</span>
-                </dt>
-                <dd>
-                  A figure summary states something the figure does not show, or leaves out what is needed to understand it.
-                </dd>
               </dl>
               <p>
                 Scores run from 1 (empty or mostly wrong) to 10 (no errors found) and must match the error list. One high-severity

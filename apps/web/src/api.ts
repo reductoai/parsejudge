@@ -75,7 +75,7 @@ export interface Run {
 
 export interface JudgedError {
   readonly category: string;
-  readonly severity: "not_error" | "low" | "medium" | "high" | "figure_error";
+  readonly severity: "low" | "medium" | "high" | "figure_error";
   readonly description: string;
   /** Excerpts of the output this error is about; `occurrence` picks which match of `text` (1-based). */
   readonly quotes?: ReadonlyArray<{ readonly text: string; readonly occurrence: number }>;
