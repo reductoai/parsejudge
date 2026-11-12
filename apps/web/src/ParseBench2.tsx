@@ -40,6 +40,8 @@ const VENDORS: Record<string, string> = {
 const DIRS = { low: "Scored too low", high: "Scored too high" } as const;
 const SEV: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
+const data = fetch(`${BASE}/data.json`).then((r) => r.json() as Promise<ReadonlyArray<Pair>>);
+
 const vendor = (v: string) => VENDORS[v] ?? v;
 const subset = (s: string) => {
   const t = s.replace(/_/g, " ");
@@ -83,8 +85,16 @@ const Scores = ({ d, big }: { readonly d: Pair; readonly big?: boolean }) => (
   </div>
 );
 
+/** A newline between text inside a table cell is a line break in the parser's output; indented newlines are formatting. */
+const cellBreaks = (html: string) =>
+  html.replace(
+    /(<t[dh]\b[^>]*>)([\s\S]*?)(?=<\/t[dh]>|<t[dhr]\b)/g,
+    (_, open: string, body: string) =>
+      open + body.replace(/(\S)\n(?=[^\s<])|([^\s>])\n(?=<(?!\/?(?:t[dhr]|table|thead|tbody|tfoot)\b)[a-z])/g, "$1$2<br>"),
+  );
+
 const Markdown = ({ md }: { readonly md: string }) => {
-  const html = useMemo(() => DOMPurify.sanitize(marked.parse(md || "*(empty output)*", { async: false })), [md]);
+  const html = useMemo(() => DOMPurify.sanitize(cellBreaks(marked.parse(md || "*(empty output)*", { async: false }))), [md]);
   // biome-ignore lint/security/noDangerouslySetInnerHtml: the HTML is sanitized with DOMPurify.
   return <div className="pb2-md" dangerouslySetInnerHTML={{ __html: html }} />;
 };
@@ -216,7 +226,7 @@ const Select = ({
         className="pb2-select-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
+        aria-label={`${label}: ${options[current]?.label ?? ""}`}
         onClick={() => setOpen(!open)}
         onKeyDown={(e) => {
           if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -318,47 +328,53 @@ const List = ({
         ]}
       />
     </div>
-    <div className="pb2-cards">
-      {view.map((d) => (
-        <a key={d.id} className="pb2-card" href={`#p${d.id}`}>
-          <img loading="lazy" src={`${CDN}/thumb/${d.id}.webp`} alt="" />
-          <div>
-            <h3>{vendor(d.vendor)}</h3>
-            <div className="pb2-sub">{subset(d.subset)}</div>
-            <Scores d={d} />
-            <p>{summary(d)}</p>
-          </div>
-        </a>
-      ))}
-      {!view.length && <p className="pb2-note">No examples for this parser here.</p>}
-    </div>
-    <article className="article pb2-ed">
-      <h2>Why these scores are wrong</h2>
-      <p>
-        ParseBench-2 is a benchmark for PDF and document parsers. It does not look at the page. It runs automatic rules and a
-        strict table matcher against each parser's output and turns the result into a score. Each example here puts the page, the
-        output and the correct answer side by side, so you can judge for yourself.
-      </p>
-      <p>
-        It fails correct tables. In 25 examples, Parse Judge scores the output 7 or higher (18 of them 9 or 10) while ParseBench-2
-        gives 3 or less. In 20 of these the table matcher is the cause: if one header is worded a little differently, or a merged
-        header cell is split another way, every cell under it counts as wrong. A table with every number right can score 0.
-      </p>
-      <p>
-        It passes broken pages. In 15 examples, ParseBench-2 scores 8.5 or higher while Parse Judge gives 5 or less. The rules
-        check only a few cells or phrases per page, so the rest goes unchecked. One page was read back to front and still scored
-        10.
-      </p>
-      <h2>How Parse Judge scores</h2>
-      <p>
-        Parse Judge is a vision model that reads the page image next to the parser's output and scores how faithful the output is,
-        from 0 to 10. It uses the same judge and prompt as every run on this site; see the <a href="/methodology">methodology</a>.
-      </p>
-      <p>
-        Teams choose a parser by its benchmark score. A score that fails correct tables and passes broken pages points them the
-        wrong way. A parsing benchmark should score what a person reading the page would see.
-      </p>
-    </article>
+    {pairs.length > 0 && (
+      <>
+        <div className="pb2-cards">
+          {view.map((d) => (
+            <a key={d.id} className="pb2-card" href={`#p${d.id}`}>
+              <img loading="lazy" src={`${CDN}/thumb/${d.id}.webp`} alt="" />
+              <div>
+                <h2>{vendor(d.vendor)}</h2>
+                <div className="pb2-sub">{subset(d.subset)}</div>
+                <Scores d={d} />
+                <p>{summary(d)}</p>
+              </div>
+            </a>
+          ))}
+          {!view.length && <p className="pb2-note">No examples for this parser here.</p>}
+        </div>
+        <article className="article pb2-ed">
+          <h2>Why these scores are wrong</h2>
+          <p>
+            ParseBench-2 is a benchmark for PDF and document parsers. It does not look at the page. It runs automatic rules and a
+            strict table matcher against each parser's output and turns the result into a score. Each example here puts the page,
+            the output and the correct answer side by side, so you can judge for yourself.
+          </p>
+          <p>
+            It fails correct tables. In 25 examples, Parse Judge scores the output 7 or higher (18 of them 9 or 10) while
+            ParseBench-2 gives 3 or less. In 20 of these the table matcher is the cause: if one header is worded a little
+            differently, or a merged header cell is split another way, every cell under it counts as wrong. A table with every
+            number right can score 0.
+          </p>
+          <p>
+            It passes broken pages. In 15 examples, ParseBench-2 scores 8.5 or higher while Parse Judge gives 5 or less. The rules
+            check only a few cells or phrases per page, so the rest goes unchecked. One page was read back to front and still
+            scored 10.
+          </p>
+          <h2>How Parse Judge scores</h2>
+          <p>
+            Parse Judge is a vision model that reads the page image next to the parser's output and scores how faithful the output
+            is, from 0 to 10. It uses the same judge and prompt as every run on this site; see the{" "}
+            <a href="/methodology">methodology</a>.
+          </p>
+          <p>
+            Teams choose a parser by its benchmark score. A score that fails correct tables and passes broken pages points them
+            the wrong way. A parsing benchmark should score what a person reading the page would see.
+          </p>
+        </article>
+      </>
+    )}
   </>
 );
 
@@ -465,9 +481,7 @@ export const ParseBench2 = () => {
   const pane = useRef<HTMLDivElement>(null);
   useEffect(() => {
     document.title = "ParseBench-2 Examples · Parse Judge";
-    fetch(`${BASE}/data.json`)
-      .then((r) => r.json() as Promise<ReadonlyArray<Pair>>)
-      .then(setPairs);
+    data.then(setPairs);
     return () => {
       document.title = "Parse Judge";
     };
@@ -497,7 +511,7 @@ export const ParseBench2 = () => {
           <List pairs={pairs} view={view} dir={dir} setDir={setDir} vend={vend} setVend={setVend} />
         )}
       </div>
-      <SiteFoot />
+      {pairs.length > 0 && <SiteFoot />}
     </Shell>
   );
 };
