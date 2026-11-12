@@ -6,7 +6,7 @@ import { CopyButton } from "./CopyButton.tsx";
 import { DeleteRun } from "./DeleteRun.tsx";
 import { Go, Shell } from "./Nav.tsx";
 import { presetTones, shortName } from "./names.ts";
-import { Report } from "./Report.tsx";
+import { Report, SmallSampleNotice } from "./Report.tsx";
 import { ShareDialog } from "./Share.tsx";
 
 export const runTitle = (run: Run) => {
@@ -97,6 +97,7 @@ const Progress = ({
 
   return (
     <div className="page rv-page">
+      <SmallSampleNotice pages={pages} />
       <div className="rv-head">
         <h1>{runTitle(run)}</h1>
         <div className="rv-pct" aria-live="polite">
