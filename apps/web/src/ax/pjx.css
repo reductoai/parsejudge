@@ -3935,6 +3935,38 @@
   text-overflow: ellipsis;
 }
 
+.pjx .rp-sample {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 0.5px solid var(--grey-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.pjx .rp-sample-ic {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.75;
+  color: var(--honey-600);
+  flex-shrink: 0;
+}
+.pjx .rp-sample-h {
+  flex-shrink: 0;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.pjx .rp-sample-d {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+
 .pjx .rp-agent {
   display: flex;
   align-items: center;

@@ -35,6 +35,25 @@ const failedOf = (p: PresetSummary) => p.failedPages + (p.skippedPages ?? 0);
 const fastest = (a: PresetSummary, b: PresetSummary) =>
   (a.latencyMsP50 ?? Number.POSITIVE_INFINITY) - (b.latencyMsP50 ?? Number.POSITIVE_INFINITY);
 
+const RECOMMENDED_PAGES = 100;
+
+/** Shown at the top of a run judged on fewer than 100 pages, where the ranking is still mostly noise. */
+export const SmallSampleNotice = ({ pages }: { readonly pages: number }) => {
+  if (pages <= 0 || pages >= RECOMMENDED_PAGES) return null;
+  const advice = `Runs under ${RECOMMENDED_PAGES} diverse pages can be very noisy. A sample of more than ${RECOMMENDED_PAGES} pages is highly recommended.`;
+  return (
+    <div className="rp-sample" role="note">
+      <Icon name="triangle-alert" className="rp-sample-ic" />
+      <span className="rp-sample-h">
+        Small sample: {pages.toLocaleString("en-US")} {pages === 1 ? "page" : "pages"}
+      </span>
+      <span className="rp-sample-d" title={advice}>
+        {advice}
+      </span>
+    </div>
+  );
+};
+
 export const Report = ({
   run,
   presets,
@@ -197,6 +216,7 @@ export const Report = ({
 
   return (
     <div className={`page rp-page ${reveal}`} id="report" ref={root}>
+      <SmallSampleNotice pages={run.pageCount - skipped} />
       <div className="rp-head">
         <div className="title-wrap">
           <h1>{title}</h1>
