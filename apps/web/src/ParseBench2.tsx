@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { currentUser } from "./api.ts";
 import { Shell, SiteBar, SiteFoot } from "./Nav.tsx";
 import "./parsebench2.css";
@@ -158,6 +158,128 @@ const Mistakes = ({ d }: { readonly d: Pair }) => {
   );
 };
 
+/** Atlas Select: trigger + listbox popover, matching @reducto/ui Select and menu specs. */
+const Select = ({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (v: string) => void;
+  readonly options: ReadonlyArray<{ readonly value: string; readonly label: string }>;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const current = Math.max(
+    0,
+    options.findIndex((o) => o.value === value),
+  );
+  useEffect(() => {
+    if (!open) return;
+    setHi(current);
+    list.current?.focus();
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    addEventListener("pointerdown", onDown);
+    return () => removeEventListener("pointerdown", onDown);
+  }, [open, current]);
+  const pick = (i: number) => {
+    const o = options[i];
+    if (o) onChange(o.value);
+    setOpen(false);
+    trigger.current?.focus();
+  };
+  const onKey = (e: ReactKeyboardEvent) => {
+    const step: Record<string, number> = { ArrowDown: 1, ArrowUp: -1 };
+    if (e.key in step) setHi((h) => (h + (step[e.key] ?? 0) + options.length) % options.length);
+    else if (e.key === "Home") setHi(0);
+    else if (e.key === "End") setHi(options.length - 1);
+    else if (e.key === "Enter" || e.key === " ") pick(hi);
+    else if (e.key === "Escape" || e.key === "Tab") {
+      setOpen(false);
+      if (e.key === "Escape") trigger.current?.focus();
+      return;
+    } else return;
+    e.preventDefault();
+  };
+  return (
+    <div ref={root} className="pb2-select">
+      <button
+        ref={trigger}
+        type="button"
+        className="pb2-select-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={label}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (!open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        <span className="pb2-select-value">{options[current]?.label}</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <path
+            d="m4 6 4 4 4-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.33"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {open && (
+        <div
+          ref={list}
+          className="pb2-select-menu"
+          role="listbox"
+          tabIndex={-1}
+          aria-label={label}
+          aria-activedescendant={`pb2-opt-${hi}`}
+          onKeyDown={onKey}
+        >
+          {options.map((o, i) => (
+            <div
+              key={o.value}
+              id={`pb2-opt-${i}`}
+              role="option"
+              tabIndex={-1}
+              aria-selected={i === current}
+              data-highlighted={i === hi || undefined}
+              onPointerMove={() => setHi(i)}
+              onClick={() => pick(i)}
+              onKeyDown={onKey}
+            >
+              <span>{o.label}</span>
+              {i === current && (
+                <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                  <path
+                    d="m3.5 8.5 3 3 6-7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.33"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const List = ({
   pairs,
   view,
@@ -186,14 +308,15 @@ const List = ({
           </button>
         ))}
       </div>
-      <select value={vend} onChange={(e) => setVend(e.target.value)} aria-label="Parser">
-        <option value="">All parsers</option>
-        {[...new Set(pairs.map((d) => d.vendor))].map((v) => (
-          <option key={v} value={v}>
-            {vendor(v)}
-          </option>
-        ))}
-      </select>
+      <Select
+        label="Parser"
+        value={vend}
+        onChange={setVend}
+        options={[
+          { value: "", label: "All parsers" },
+          ...[...new Set(pairs.map((d) => d.vendor))].map((v) => ({ value: v, label: vendor(v) })),
+        ]}
+      />
     </div>
     <div className="pb2-cards">
       {view.map((d) => (
@@ -242,7 +365,9 @@ const List = ({
 const Detail = ({ d, view }: { readonly d: Pair; readonly view: ReadonlyArray<Pair> }) => {
   const mobile = useMemo(() => matchMedia("(max-width: 860px)").matches, []);
   const [tab, setTab] = useState<"page" | "out" | "ref">(mobile ? "page" : "out");
-  useEffect(() => setTab(mobile ? "page" : "out"), [mobile]);
+  useEffect(() => {
+    setTab(mobile ? "page" : "out");
+  }, [mobile]);
   const i = view.indexOf(d);
   const step = (k: number) => {
     const n = view[(i + k + view.length) % view.length];
@@ -355,7 +480,9 @@ export const ParseBench2 = () => {
       setVend("");
     }
   }, [current, dir]);
-  useEffect(() => pane.current?.scrollTo(0, 0), []);
+  useEffect(() => {
+    pane.current?.scrollTo(0, 0);
+  }, []);
   const view = pairs.filter((d) => d.dir === dir && (!vend || d.vendor === vend));
   return (
     <Shell topbar={<SiteBar user={currentUser()} />} label="ParseBench-2 Examples" pane={pane}>
