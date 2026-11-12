@@ -15,7 +15,7 @@ export class Converter extends Container<Env> {
 
 class ConverterUnavailable extends Data.TaggedError("ConverterUnavailable")<{ readonly message: string }> {}
 
-const INSTANCES = 4;
+export const INSTANCES = 4; // must equal max_instances in both wrangler configs (test/containers.test.ts)
 
 const convert = (env: Env, format: Exclude<DocumentFormat, "pdf">, bytes: Uint8Array) =>
   Effect.tryPromise({

@@ -12,7 +12,7 @@ export class Splitter extends Container<Env> {
 
 export class SplitterUnavailable extends Data.TaggedError("SplitterUnavailable")<{ readonly message: string }> {}
 
-const INSTANCES = 4;
+export const INSTANCES = 4; // must equal max_instances in both wrangler configs (test/containers.test.ts)
 
 /** PDFs larger than this are split in the container; pdf-lib needs several times the file size in memory. */
 export const SPLIT_IN_WORKER_MAX_BYTES = 5 * 1024 * 1024;
