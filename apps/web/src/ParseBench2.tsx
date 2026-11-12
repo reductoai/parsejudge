@@ -206,34 +206,28 @@ const List = ({
     <article className="article pb2-ed">
       <h2>Why these scores are wrong</h2>
       <p>
-        ParseBench-2 is a benchmark for PDF and document parsers. It does not look at the page. It runs a set of automatic rules
-        and a strict table matcher against each parser's output, and turns the result into a score.
+        ParseBench-2 is a benchmark for PDF and document parsers. It does not look at the page. It runs automatic rules and a
+        strict table matcher against each parser's output and turns the result into a score. Each example here puts the page, the
+        output and the correct answer side by side, so you can judge for yourself.
       </p>
       <p>
-        That works until the rules miss what a person would see. Each example here puts the page, the parser's output and the
-        correct answer side by side, so you can judge for yourself.
+        It fails correct tables. In 25 examples, Parse Judge scores the output 7 or higher (18 of them 9 or 10) while ParseBench-2
+        gives 3 or less. In 20 of these the table matcher is the cause: if one header is worded a little differently, or a merged
+        header cell is split another way, every cell under it counts as wrong. A table with every number right can score 0.
       </p>
-      <h2>Correct tables scored zero</h2>
       <p>
-        In 25 examples, Parse Judge scores the output 7 or higher (18 of them 9 or 10), while ParseBench-2 gives 3 or less. In 20
-        of these, the table matcher is the cause. If one header is worded a little differently, or a merged header cell is split
-        another way, every cell under it counts as wrong. A table with every number right can score 0.
-      </p>
-      <h2>Broken pages scored ten</h2>
-      <p>
-        In 15 examples it goes the other way: ParseBench-2 scores 8.5 or higher, while Parse Judge gives 5 or less. The rules
-        check only a few cells or phrases per page, so everything else goes unchecked. One page was read back to front and still
-        scored 10.
-      </p>
-      <h2>Why it matters</h2>
-      <p>
-        Teams choose a parser by its benchmark score. A score that fails correct tables and passes broken pages points them the
-        wrong way. We think a parsing benchmark should score what a person reading the page would see.
+        It passes broken pages. In 15 examples, ParseBench-2 scores 8.5 or higher while Parse Judge gives 5 or less. The rules
+        check only a few cells or phrases per page, so the rest goes unchecked. One page was read back to front and still scored
+        10.
       </p>
       <h2>How Parse Judge scores</h2>
       <p>
         Parse Judge is a vision model that reads the page image next to the parser's output and scores how faithful the output is,
         from 0 to 10. It uses the same judge and prompt as every run on this site; see the <a href="/methodology">methodology</a>.
+      </p>
+      <p>
+        Teams choose a parser by its benchmark score. A score that fails correct tables and passes broken pages points them the
+        wrong way. A parsing benchmark should score what a person reading the page would see.
       </p>
     </article>
   </>
