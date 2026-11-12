@@ -26,6 +26,7 @@ type Pair = {
 };
 
 const BASE = "/parsebench-2";
+const CDN = "https://cdn.reducto.ai/parsejudge/parsebench-2";
 const VENDORS: Record<string, string> = {
   reducto_r1: "Reducto r-1",
   llamaparse_agentic_plus: "LlamaParse Agentic Plus",
@@ -197,7 +198,7 @@ const List = ({
     <div className="pb2-cards">
       {view.map((d) => (
         <a key={d.id} className="pb2-card" href={`#p${d.id}`}>
-          <img loading="lazy" src={`${BASE}/thumb/${d.id}.webp`} alt="" />
+          <img loading="lazy" src={`${CDN}/thumb/${d.id}.webp`} alt="" />
           <div>
             <h3>{vendor(d.vendor)}</h3>
             <div className="pb2-sub">{subset(d.subset)}</div>
@@ -273,7 +274,7 @@ const Detail = ({ d, view }: { readonly d: Pair; readonly view: ReadonlyArray<Pa
     ...(ref ? [["ref", ref.title, false] as const] : []),
   ] as const;
   const shown = !mobile && tab === "page" ? "out" : tab;
-  const page = <img src={`${BASE}/img/${d.id}.webp`} alt="Source page" />;
+  const page = <img src={`${CDN}/img/${d.id}.webp`} alt="Source page" />;
   return (
     <>
       <div className="pb2-dhead">
@@ -360,7 +361,11 @@ export const ParseBench2 = () => {
     <Shell topbar={<SiteBar user={currentUser()} />} label="ParseBench-2 Examples" pane={pane}>
       <div className="page md-page pb2">
         {current ? (
-          <Detail d={current} view={view.includes(current) ? view : pairs.filter((d) => d.dir === current.dir)} />
+          <Detail
+            key={current.id}
+            d={current}
+            view={view.includes(current) ? view : pairs.filter((d) => d.dir === current.dir)}
+          />
         ) : (
           <List pairs={pairs} view={view} dir={dir} setDir={setDir} vend={vend} setVend={setVend} />
         )}
