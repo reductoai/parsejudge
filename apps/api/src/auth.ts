@@ -441,9 +441,7 @@ const signOut = Effect.fn("signOut")(function* (env: Env, request: Request) {
 });
 
 const me = (env: Env, request: Request) =>
-  sessionUser(env, request.headers.get("cookie")).pipe(
-    Effect.map((user) => (user === null ? fail(401, "Not signed in.") : reply({ email: user.email }))),
-  );
+  sessionUser(env, request.headers.get("cookie")).pipe(Effect.map((user) => reply({ email: user?.email ?? null })));
 
 /** A route that fails or dies answers with a logged 500 in the `{ error }` shape the sign-in page reads. */
 const guarded = <E, R>(env: Env, pathname: string, route: Effect.Effect<Response, E, R>) =>

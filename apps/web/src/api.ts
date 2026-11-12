@@ -135,7 +135,7 @@ let user: string | null = null;
 /** Loads the signed-in email from the session cookie. Called once before the first render. */
 export const loadUser = async () => {
   const response = await fetch("/v1/me").catch(() => null);
-  user = response?.ok ? ((await response.json()) as { email: string }).email : null;
+  user = response?.ok ? (((await response.json()) as { email: string | null }).email ?? null) : null;
 };
 export const currentUser = () => user;
 export const setUser = (email: string | null) => {
