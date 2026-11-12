@@ -10,6 +10,7 @@ import { Landing } from "./Landing.tsx";
 import { Legal } from "./Legal.tsx";
 import { Methodology } from "./Methodology.tsx";
 import { PageCompare } from "./PageCompare.tsx";
+import { ParseBench2 } from "./ParseBench2.tsx";
 import { RunPage } from "./RunPage.tsx";
 import { Runs } from "./Runs.tsx";
 import { useRoute } from "./router.ts";
@@ -21,6 +22,7 @@ const App = () => {
   if (route.name === "account") return <Account />;
   if (route.name === "runs") return <Runs />;
   if (route.name === "methodology") return <Methodology />;
+  if (route.name === "parsebench2") return <ParseBench2 />;
   if (route.name === "terms" || route.name === "privacy") return <Legal doc={route.name} />;
   if (route.name === "signin") return <SignInPage next={route.next} />;
   if (route.name === "auth") return <SignInLink token={route.token} />;
