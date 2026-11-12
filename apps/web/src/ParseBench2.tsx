@@ -84,6 +84,7 @@ const Scores = ({ d, big }: { readonly d: Pair; readonly big?: boolean }) => (
 
 const Markdown = ({ md }: { readonly md: string }) => {
   const html = useMemo(() => DOMPurify.sanitize(marked.parse(md || "*(empty output)*", { async: false })), [md]);
+  // biome-ignore lint/security/noDangerouslySetInnerHtml: the HTML is sanitized with DOMPurify.
   return <div className="pb2-md" dangerouslySetInnerHTML={{ __html: html }} />;
 };
 
@@ -124,12 +125,15 @@ const Checks = ({ d }: { readonly d: Pair }) => {
     ...table.map((w, i) => {
       const m = /^\[(\w+)\] (.*)$/.exec(w.trim());
       return i === 0 ? (
+        // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity beyond their slot
         <Row key={`t${i}`} mark="x" text={w.replace(/^table_next: /, "Table check: ")} />
       ) : (
+        // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity beyond their slot
         <Row key={`t${i}`} mark="dot" text={m?.[2] ?? w.trim()} note={m?.[1]} />
       );
     }),
     ...[...rules.filter((r) => !r.ok), ...passed].map((r, i) => (
+      // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity beyond their slot
       <Row key={`r${i}`} mark={r.ok ? "v" : "x"} text={r.x || (r.ok ? "passed" : "failed")} note={r.t.replace(/_/g, " ")} />
     )),
   ];
@@ -146,6 +150,7 @@ const Mistakes = ({ d }: { readonly d: Pair }) => {
   return (
     <Rows title="Mistakes Parse Judge found" count={String(errors.length)}>
       {errors.map((e, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: rows have no identity beyond their slot
         <Row key={i} mark="x" text={e.description} note={`${e.severity} · ${(e.category ?? "").replace(/_/g, " ")}`} />
       ))}
     </Rows>
@@ -273,7 +278,15 @@ const Detail = ({ d, view }: { readonly d: Pair; readonly view: ReadonlyArray<Pa
     <>
       <div className="pb2-dhead">
         <div className="pb2-dnav">
-          <a href="#">← All examples</a>
+          <button
+            type="button"
+            className="pb2-back"
+            onClick={() => {
+              location.hash = "";
+            }}
+          >
+            ← All examples
+          </button>
           <span>
             {i + 1} / {view.length}
           </span>
