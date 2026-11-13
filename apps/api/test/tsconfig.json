@@ -4,5 +4,5 @@
     "lib": ["ES2023"],
     "types": ["@cloudflare/workers-types"]
   },
-  "include": [".", "../src/wasm.d.ts"]
+  "include": [".", "../eval", "../src/wasm.d.ts"]
 }

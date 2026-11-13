@@ -105,6 +105,23 @@ Traces of each request and workflow step are in Workers Observability.
 pnpm check && pnpm test && pnpm lint
 ```
 
+## Judge golden set
+
+`apps/api/eval` checks the judge against pages whose content is known exactly. Four generated pages (prose, a
+table, a form with checkboxes, two columns) each get an untouched copy and copies with one planted error: a changed
+digit, a dropped table row, swapped table columns, a flipped checkbox, merged columns, a dropped paragraph, a
+repetition loop, an invented sentence, a lowercased heading. The judge scores them the way it scores real parses, and
+the report shows which planted errors it caught, in the right category and severity, and what it reported on the
+untouched copies.
+
+```sh
+cd apps/api
+OPENAI_API_KEY=... pnpm judge-eval   # the production judge model and settings, from wrangler.prod.jsonc
+pnpm judge-eval --oracle             # a judge handed the answers: checks the pipeline without API calls
+```
+
+`--solo` judges each copy in its own call. Results go to `apps/api/eval/results/`.
+
 ## License
 
 [Apache-2.0](LICENSE). Copyright Reducto, Inc. The Parse Judge and Reducto names are not licensed for use by forks.

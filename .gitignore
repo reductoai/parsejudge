@@ -3,3 +3,4 @@ node_modules
 .dev.vars
 dist
 *.local.jsonc
+apps/api/eval/results
