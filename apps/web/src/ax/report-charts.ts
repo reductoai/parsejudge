@@ -40,6 +40,8 @@ export interface ReportData {
   readonly entries: ReadonlyArray<Entry>;
   readonly pages: ReadonlyArray<PageRow>;
   readonly h2h: HeadToHead;
+  readonly headToHead: ReadonlyArray<{ presetId: string; opponentId: string; wins: number; ties: number; losses: number }>;
+  readonly headToHeadEntries: ReadonlyArray<Pick<Entry, "id" | "provider">>;
   /** Page images and parser output are private to the owner. */
   readonly contentHidden: boolean;
   readonly detail: (pageId: string) => Promise<PageDetail | null>;
@@ -229,18 +231,26 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
   let h2hOn: string | null = null;
   const ent = (id: string) => E.find((e) => e.id === id) as Entry;
   function h2h() {
-    const head = `<tr><th></th>${E.map((e) => `<th>vs ${esc(e.provider)}</th>`).join("")}</tr>`;
-    const rows = E.map(
-      (a) =>
-        `<tr><td><span class="rn">${esc(a.provider)}</span></td>${E.map((b) => {
-          if (a === b) return '<td class="dash">—</td>';
-          const r = R.h2h[a.id]?.[b.id];
-          if (!r) return '<td class="dash">—</td>';
-          const n = (k: Outcome, cls: string) =>
-            `<button class="h2h-n ${cls}" type="button" data-a="${a.id}" data-b="${b.id}" data-k="${k}"${r[k].length && !R.contentHidden ? "" : " disabled"}>${r[k].length}</button>`;
-          return `<td>${n("wins", "w")}<span class="sep">·</span>${n("ties", "t")}<span class="sep">·</span>${n("losses", "l")}</td>`;
-        }).join("")}</tr>`,
-    ).join("");
+    const entries = R.headToHeadEntries;
+    const head = `<tr><th></th>${entries.map((e) => `<th>vs ${esc(e.provider)}</th>`).join("")}</tr>`;
+    const rows = entries
+      .map(
+        (a) =>
+          `<tr><td><span class="rn">${esc(a.provider)}</span></td>${entries
+            .map((b) => {
+              if (a === b) return '<td class="dash">—</td>';
+              const r = R.h2h[a.id]?.[b.id];
+              const counts = R.headToHead.find((row) => row.presetId === a.id && row.opponentId === b.id);
+              if (!counts) return '<td class="dash">—</td>';
+              const n = (k: Outcome, cls: string) => {
+                const complete = counts[k] > 0 && r?.[k].length === counts[k] && !R.contentHidden;
+                return `<button class="h2h-n ${cls}" type="button" data-a="${a.id}" data-b="${b.id}" data-k="${k}"${complete ? "" : " disabled"}>${counts[k]}</button>`;
+              };
+              return `<td>${n("wins", "w")}<span class="sep">·</span>${n("ties", "t")}<span class="sep">·</span>${n("losses", "l")}</td>`;
+            })
+            .join("")}</tr>`,
+      )
+      .join("");
     $("h2h").innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody>`;
     for (const b of $("h2h").querySelectorAll<HTMLButtonElement>(".h2h-n"))
       b.onclick = () => {
