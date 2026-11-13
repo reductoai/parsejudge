@@ -1,7 +1,15 @@
 import DOMPurify from "dompurify";
-import { marked } from "marked";
-import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { currentUser } from "./api.ts";
+import { parseMarkdown, renderMath, wrapRawMath } from "./math.ts";
 import { Shell, SiteBar, SiteFoot } from "./Nav.tsx";
 import "./parsebench2.css";
 
@@ -94,9 +102,15 @@ const cellBreaks = (html: string) =>
   );
 
 const Markdown = ({ md }: { readonly md: string }) => {
-  const html = useMemo(() => DOMPurify.sanitize(cellBreaks(marked.parse(md || "*(empty output)*", { async: false }))), [md]);
-  // biome-ignore lint/security/noDangerouslySetInnerHtml: the HTML is sanitized with DOMPurify.
-  return <div className="pb2-md" dangerouslySetInnerHTML={{ __html: html }} />;
+  const html = useMemo(() => DOMPurify.sanitize(cellBreaks(parseMarkdown(md || "*(empty output)*"))), [md]);
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (ref.current === null) return;
+    ref.current.innerHTML = html;
+    wrapRawMath(ref.current);
+    void renderMath(ref.current);
+  }, [html]);
+  return <div ref={ref} className="pb2-md" />;
 };
 
 const Rows = ({ title, count, children }: { readonly title: string; readonly count: string; readonly children: ReactNode }) => (
