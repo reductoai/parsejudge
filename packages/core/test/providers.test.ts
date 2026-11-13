@@ -13,6 +13,7 @@ const credentials: Credentials = {
   LLAMA_CLOUD_API_KEY: "k",
   AZURE_DI_KEY: "k",
   COHERE_API_KEY: "k",
+  NUTRIENT_API_KEY: "k",
 };
 
 /** Runs an adapter call against a fetch that always answers `respond()`. */
@@ -99,6 +100,30 @@ describe("provider adapters", () => {
     if (Exit.isFailure(exit) || exit.value._tag !== "Done") throw new Error("expected a finished parse");
     expect(exit.value.output.markdown).toContain("1 Name of entity/individual.");
     expect(exit.value.output.warning).toContain("MAX_TOKENS");
+  });
+  it("send Nutrient the page URL with the preset's instructions, and read its markdown and credits", async () => {
+    const requests: Array<{ url: string; headers: Headers; body: string }> = [];
+    const fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      requests.push({ url: request.url, headers: request.headers, body: await request.text() });
+      return new Response(JSON.stringify({ output: { markdown: "# Invoice" }, usage: { data_extraction_credits: { cost: 9 } } }));
+    };
+    const config = { mode: "understand", output: { format: "markdown" } };
+    const exit = await Effect.runPromiseExit(
+      PROVIDERS.nutrient
+        .submit(page, config, credentials)
+        .pipe(
+          Effect.provide(FetchHttpClient.layer),
+          Effect.provide(Layer.succeed(FetchHttpClient.Fetch, fetch as typeof globalThis.fetch)),
+        ),
+    );
+    expect(requests[0]?.url).toBe("https://api.nutrient.io/extraction/parse");
+    expect(requests[0]?.headers.get("authorization")).toBe("Bearer k");
+    expect(requests[0]?.headers.get("x-nutrient-api-version")).toBe("2026-05-25");
+    expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({ ...config, url: page.imageUrl });
+    if (!Exit.isSuccess(exit) || exit.value._tag !== "Done") throw new Error(String(exit));
+    expect(exit.value.output.markdown).toBe("# Invoice");
+    expect(exit.value.output.reportedCost?.usd).toBeCloseTo(0.009);
   });
 });
 

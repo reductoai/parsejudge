@@ -9,6 +9,7 @@ import { extend } from "./extend.ts";
 import { google } from "./google.ts";
 import { llamaparse } from "./llamaparse.ts";
 import { mistral } from "./mistral.ts";
+import { nutrient } from "./nutrient.ts";
 import { pulse } from "./pulse.ts";
 import { reducto } from "./reducto.ts";
 import { textract } from "./textract.ts";
@@ -24,6 +25,7 @@ const BUILTIN: Readonly<Record<ProviderId, ProviderAdapter>> = {
   datalab,
   pulse,
   cohere,
+  nutrient,
 };
 
 export const PROVIDERS: typeof BUILTIN & Readonly<Record<string, ProviderAdapter>> = {

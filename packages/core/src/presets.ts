@@ -27,6 +27,18 @@ const datalab = (mode: string): ProviderConfig => ({
   additional_config: { keep_pageheader_in_output: true, keep_pagefooter_in_output: true },
 });
 
+/** The markdown settings from Nutrient's own WholeDoc Bench adapter, with page headers and footers kept like the other providers here. */
+const nutrient = (mode: string): ProviderConfig => ({
+  mode,
+  output: {
+    format: "markdown",
+    includeHeadersAndFooters: true,
+    useHtmlTables: true,
+    enableSemanticBlockFormatting: true,
+    enableInlineFormatting: true,
+  },
+});
+
 const BUILTIN_PRESETS: ReadonlyArray<Preset> = [
   {
     id: "reducto_r1",
@@ -193,6 +205,33 @@ const BUILTIN_PRESETS: ReadonlyArray<Preset> = [
     label: "Cohere Parse v5",
     mode: "Parse v5",
     config: { model: "parse-v5.0", output_format: "markdown" },
+    listPriceUsdPerPage: 0.0015,
+    hosted: false,
+  },
+  {
+    id: "nutrient_agentic",
+    provider: "nutrient",
+    label: "Nutrient Agentic",
+    mode: "Agentic",
+    config: nutrient("agentic"),
+    listPriceUsdPerPage: 0.018,
+    hosted: false,
+  },
+  {
+    id: "nutrient_understand",
+    provider: "nutrient",
+    label: "Nutrient Understand",
+    mode: "Understand",
+    config: nutrient("understand"),
+    listPriceUsdPerPage: 0.009,
+    hosted: false,
+  },
+  {
+    id: "nutrient_structure",
+    provider: "nutrient",
+    label: "Nutrient Structure",
+    mode: "Structure",
+    config: nutrient("structure"),
     listPriceUsdPerPage: 0.0015,
     hosted: false,
   },

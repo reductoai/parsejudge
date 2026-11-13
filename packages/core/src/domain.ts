@@ -11,6 +11,7 @@ export const ProviderId = Schema.Literals([
   "datalab",
   "pulse",
   "cohere",
+  "nutrient",
 ]);
 export type ProviderId = typeof ProviderId.Type;
 
