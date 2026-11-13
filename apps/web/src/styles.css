@@ -1864,3 +1864,35 @@ svg.caret {
 .zdr-banner span {
   color: #d4d4d4;
 }
+.math {
+  position: relative;
+}
+.math-rendered > .math-src {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.math-block {
+  display: block;
+}
+.math-out .katex-display {
+  margin: 0.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.math:has(mark.flag.low, mark.flag.medium, mark.flag.figure_error) > .math-out {
+  text-decoration: underline wavy var(--bad);
+  text-underline-offset: 3px;
+}
+.math-out .katex .tag {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  text-transform: none;
+}

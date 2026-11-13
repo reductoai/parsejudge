@@ -1,8 +1,8 @@
 import DOMPurify from "dompurify";
-import { marked } from "marked";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, type JudgedError, type PageDetail, type PageParse, type Preset, type Run } from "./api.ts";
 import { Icon } from "./ax/Icon.tsx";
+import { parseMarkdown, renderMath, wrapRawMath } from "./math.ts";
 import { providerName, SHORT_NAMES } from "./names.ts";
 import { navigate } from "./router.ts";
 import { ShareDialog } from "./Share.tsx";
@@ -38,7 +38,7 @@ interface PageSort {
 }
 
 const FLAG_GAP = 3;
-const BLOCKS = "p,li,td,th,h1,h2,h3,h4,h5,h6,blockquote,pre";
+const BLOCKS = "p,li,td,th,h1,h2,h3,h4,h5,h6,blockquote,pre,.math-block";
 const RANK: Record<Severity, number> = { high: 0, figure_error: 1, medium: 2, low: 3, not_error: 4 };
 
 const isFlagged = (page: PageStat) => page.failed || page.gap >= FLAG_GAP || page.high > 0;
@@ -125,7 +125,7 @@ const markQuotes = (root: HTMLElement, flags: ReadonlyArray<JudgedError>): Array
       const matches: Array<{ node: Text; at: number }> = [];
       for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
         const text = node as Text;
-        if (text.parentElement?.closest(".flag-badges")) continue;
+        if (text.parentElement?.closest(".flag-badges,.math-out")) continue;
         for (let at = text.data.indexOf(q); at !== -1; at = text.data.indexOf(q, at + 1)) matches.push({ node: text, at });
       }
       const match = matches[quote.occurrence - 1];
@@ -159,7 +159,7 @@ const markQuotes = (root: HTMLElement, flags: ReadonlyArray<JudgedError>): Array
     return marks;
   });
 
-const LINK_BLOCKS = "p,li,h1,h2,h3,h4,h5,h6,blockquote,pre,table";
+const LINK_BLOCKS = "p,li,h1,h2,h3,h4,h5,h6,blockquote,pre,table,.math-block";
 const WORDS = new WeakMap<Element, ReadonlySet<string>>();
 const wordsOf = (text: string): ReadonlySet<string> =>
   new Set((text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length > 1));
@@ -214,13 +214,15 @@ const FlaggedOutput = ({
   readonly flags: ReadonlyArray<JudgedError>;
   readonly onFound: (marks: Array<Array<HTMLElement>>) => void;
 }) => {
-  const html = useMemo(() => DOMPurify.sanitize(marked.parse(markdown, { async: false })), [markdown]);
+  const html = useMemo(() => DOMPurify.sanitize(parseMarkdown(markdown)), [markdown]);
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (ref.current === null) return;
     ref.current.innerHTML = html;
+    wrapRawMath(ref.current);
     tagBlocks(ref.current, column);
     onFound(markQuotes(ref.current, flags));
+    void renderMath(ref.current);
   }, [html, flags, column, onFound]);
   return <div ref={ref} className="markdown flagged-output" />;
 };
