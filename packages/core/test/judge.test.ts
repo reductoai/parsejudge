@@ -76,8 +76,44 @@ describe("judgePage", () => {
     const first = (ids: Array<string>) => ids[0] as string;
     expect(String(await judgeWith((ids) => [evaluation(first(ids), 5)]))).toContain("did not score every parse");
     expect(String(await judgeWith((ids) => [evaluation(first(ids), 5), evaluation(first(ids), 6)]))).toContain(
-      "did not score every parse",
+      "Duplicate judge label",
     );
+  });
+
+  it("rejects a repeated label even when every parse is present", async () => {
+    const exit = await judgeWith((ids) => [
+      evaluation(ids[0] as string, 2),
+      evaluation(ids[0] as string, 10),
+      evaluation(ids[1] as string, 5),
+    ]);
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(String(exit)).toContain("Duplicate judge label");
+    expect(retryable(exit)).toBe(true);
+  });
+
+  it.each([
+    ["figure_precision", "high"],
+    ["figure_precision", "low"],
+    ["figure_recall", "high"],
+    ["figure_recall", "low"],
+    ["text_corruption", "figure_error"],
+  ])("rejects category %s with severity %s", async (category, severity) => {
+    const exit = await judgeWith((ids) =>
+      ids.map((id) => ({ ...evaluation(id, 5), errors: [{ category, severity, description: "Incorrect figure severity" }] })),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(String(exit)).toContain("Invalid judge error severity");
+    expect(retryable(exit)).toBe(true);
+  });
+
+  it.each(["figure_precision", "figure_recall"])("accepts category %s with figure_error severity", async (category) => {
+    const exit = await judgeWith((ids) =>
+      ids.map((id) => ({
+        ...evaluation(id, 5),
+        errors: [{ category, severity: "figure_error", description: "Incorrect figure summary" }],
+      })),
+    );
+    expect(Exit.isSuccess(exit)).toBe(true);
   });
 
   it("fails on out-of-range scores and HTTP errors", async () => {
