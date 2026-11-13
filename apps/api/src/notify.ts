@@ -33,6 +33,7 @@ const PROVIDER_NAMES: Readonly<Record<string, string>> = {
   datalab: "Datalab",
   pulse: "Pulse",
   cohere: "Cohere",
+  nutrient: "Nutrient",
 };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;

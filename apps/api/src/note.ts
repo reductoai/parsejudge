@@ -23,6 +23,7 @@ const SHORT_NAMES: Record<string, string> = {
   datalab: "Datalab",
   pulse: "Pulse",
   cohere: "Cohere",
+  nutrient: "Nutrient",
 };
 
 type Row = { preset_id: string; status: string; error: string | null; score: number | null; errors: string | null };

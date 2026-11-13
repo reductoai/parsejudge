@@ -9,6 +9,7 @@ export const PROVIDER_NAMES: Record<string, string> = {
   datalab: "Datalab",
   pulse: "Pulse",
   cohere: "Cohere",
+  nutrient: "Nutrient",
 };
 
 export const SHORT_NAMES: Record<string, string> = {
@@ -27,6 +28,7 @@ export const BYOK_KEY: Record<string, string> = {
   datalab: "DATALAB_API_KEY",
   pulse: "PULSE_API_KEY",
   cohere: "COHERE_API_KEY",
+  nutrient: "NUTRIENT_API_KEY",
 };
 
 /** `bedrock_data_automation` -> `Bedrock Data Automation`, for providers this build has no name for. */
@@ -48,6 +50,7 @@ export const PROVIDER_ORDER = [
   "datalab",
   "pulse",
   "cohere",
+  "nutrient",
 ];
 export const providerRank = (id: string) => {
   const rank = PROVIDER_ORDER.indexOf(id);

@@ -40,6 +40,7 @@ for every page. The prompt and scoring code are in this repo.
 | Datalab (Marker)            | accurate, balanced, fast              | bring your own key |
 | Pulse                       | Ultra 2, refine                       | bring your own key |
 | Cohere                      | Parse v5                              | bring your own key |
+| Nutrient                    | agentic, understand, structure        | bring your own key |
 
 `GET /v1/presets` returns the full list with list prices. To add a provider, add an adapter in
 `packages/core/src/providers` and a preset in `packages/core/src/presets.ts`. A self-hosted build can add
