@@ -1,8 +1,9 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep, type WorkflowStepConfig } from "cloudflare:workers";
-import { decodeJson, JUDGE_VERSION, judgePage, splitPages } from "@parsejudge/core";
+import { decodeJson, JUDGE_VERSION, judgePage } from "@parsejudge/core";
 import { Data, Effect } from "effect";
 import type { Env } from "./env.ts";
 import { StorageFailed, storage } from "./errors.ts";
+import { splitToR2 } from "./ingest.ts";
 import { documentKey, markdownKey, pageId, pagePdfKey, pagePngKey } from "./keys.ts";
 import { writeLocations } from "./locate.ts";
 import { writePageNote } from "./note.ts";
@@ -160,7 +161,9 @@ const startRetry = Effect.fn("startRetry")(function* (
 /** Upload already splits the document; this covers an upload whose split did not finish. */
 const preparePages = Effect.fn("preparePages")(function* (env: Env, documentId: string) {
   const document = yield* storage(() =>
-    env.DB.prepare("SELECT page_count FROM documents WHERE id = ?").bind(documentId).first<{ page_count: number }>(),
+    env.DB.prepare("SELECT page_count, pdf_key FROM documents WHERE id = ?")
+      .bind(documentId)
+      .first<{ page_count: number; pdf_key: string | null }>(),
   );
   const count = document?.page_count ?? 0;
   const ids = Array.from({ length: count }, (_, index) => pageId(documentId, index));
@@ -168,19 +171,22 @@ const preparePages = Effect.fn("preparePages")(function* (env: Env, documentId: 
     env.DB.prepare("SELECT COUNT(*) AS n FROM pages WHERE document_id = ?").bind(documentId).first<{ n: number }>(),
   );
   if (split?.n === count) return ids;
-  const source = yield* storage(() => env.BLOBS.get(documentKey(documentId)));
-  if (source === null) return yield* new StorageFailed({ message: `Missing document ${documentId}` });
-  const bytes = yield* storage(() => source.arrayBuffer());
-  const pages = yield* splitPages(new Uint8Array(bytes), count);
-  for (const [index, pdf] of pages.entries()) {
-    const id = pageId(documentId, index);
-    yield* storage(() => env.BLOBS.put(pagePdfKey(id), pdf));
-    yield* storage(() =>
-      env.DB.prepare("INSERT OR IGNORE INTO pages (id, document_id, page_index, rendered) VALUES (?, ?, ?, 0)")
-        .bind(id, documentId, index)
-        .run(),
-    );
-  }
+  const pdfKey = document?.pdf_key ?? documentKey(documentId);
+  const pdf = yield* storage(() => env.BLOBS.head(pdfKey));
+  if (pdf === null) return yield* new StorageFailed({ message: `Missing document ${documentId}` });
+  // Large PDFs go through the splitter container, as on upload; the Worker cannot hold them.
+  yield* splitToR2(env, documentId, pdfKey, pdf.size, count);
+  yield* storage(() =>
+    env.DB.batch(
+      ids.map((id, index) =>
+        env.DB.prepare("INSERT OR IGNORE INTO pages (id, document_id, page_index, rendered) VALUES (?, ?, ?, 0)").bind(
+          id,
+          documentId,
+          index,
+        ),
+      ),
+    ),
+  );
   return ids;
 });
 

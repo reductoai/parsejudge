@@ -74,6 +74,8 @@ const buildServer = (env: Env, userId: string, oauth: OAuthHelpers) => {
     if (body instanceof ArrayBuffer) {
       payload = body;
       headers.set("content-type", "application/octet-stream");
+      // A Request does not get a content-length header from its body; the upload handler needs one.
+      headers.set("content-length", String(body.byteLength));
     } else if (body !== undefined) {
       payload = JSON.stringify(body);
       headers.set("content-type", "application/json");
