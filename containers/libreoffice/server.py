@@ -1,6 +1,11 @@
-"""Converts DOCX and PPTX to PDF with headless LibreOffice. One soffice per request, each with its own profile."""
+"""Converts DOCX and PPTX to PDF with headless LibreOffice. One soffice per request, each with its own profile.
+
+The profile is a copy of one built in the image (see the Dockerfile), so soffice doesn't initialize a new one on
+every request. It's a copy rather than shared because soffice locks its profile and requests can run at once.
+"""
 
 import os
+import shutil
 import subprocess
 import tempfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -9,6 +14,7 @@ EXTENSIONS = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
 }
+PROFILE = "/opt/libreoffice-profile"
 TIMEOUT_SECONDS = 300
 
 
@@ -25,6 +31,7 @@ class Handler(BaseHTTPRequestHandler):
             source = os.path.join(work, f"document.{extension}")
             with open(source, "wb") as file:
                 file.write(body)
+            shutil.copytree(PROFILE, os.path.join(work, "profile"))
             result = subprocess.run(
                 [
                     "soffice",
