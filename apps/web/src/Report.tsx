@@ -270,13 +270,24 @@ export const Report = ({
                     <div className="who-m">{preset?.mode}</div>
                   </div>
                 </div>
-                <div className="score">
-                  <span className="score-n">{p.meanScore === null ? "–" : p.meanScore.toFixed(1)}</span>
-                  <span className="score-bar">
-                    <span style={{ width: grown ? `${(p.meanScore ?? 0) * 10}%` : 0 }} />
-                  </span>
+                <div>
+                  <div className="score">
+                    <span className="score-n">{p.meanScore === null ? "–" : p.meanScore.toFixed(1)}</span>
+                    <span className="score-bar">
+                      <span style={{ width: grown ? `${(p.meanScore ?? 0) * 10}%` : 0 }} />
+                    </span>
+                  </div>
+                  <div className="rp-stat">Median {p.medianScore === null ? "–" : p.medianScore.toFixed(1)}</div>
                 </div>
-                <div className="num">{p.highSeverityRate === null ? "–" : pct(p.highSeverityRate)}</div>
+                <div className="num">
+                  {p.highSeverityRate === null ? "–" : pct(p.highSeverityRate)}
+                  <div className="rp-stat" title="95% Wilson confidence interval">
+                    95% CI{" "}
+                    {p.highSeverityInterval === null
+                      ? "–"
+                      : `${pct(p.highSeverityInterval.low)}–${pct(p.highSeverityInterval.high)}`}
+                  </div>
+                </div>
                 <div className="num">{perK(p.listPriceUsdPerPage)}</div>
                 <div className="num soft">
                   {secs(p.latencyMsP50)} · {secs(p.latencyMsP95)} s
