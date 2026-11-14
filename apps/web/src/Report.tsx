@@ -182,6 +182,8 @@ export const Report = ({
       entries,
       pages,
       h2h: h2h as HeadToHead,
+      headToHead: summary.headToHead,
+      headToHeadEntries: ranked.map((p) => ({ id: p.presetId, provider: name(p.presetId) })),
       contentHidden: contentHidden || gone,
       detail: (pageId) => api.page(run.id, pageId).catch(() => null),
       compare: (pageId) => `/r/${run.shareId}/p/${pageId}`,
