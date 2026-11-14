@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!**/worker-configuration.d.ts", "!pnpm-lock.yaml"] },
+  "files": { "includes": ["**", "!**/worker-configuration.d.ts", "!pnpm-lock.yaml", "!**/package-lock.json"] },
   "formatter": { "indentStyle": "space", "lineWidth": 130 },
   "linter": { "enabled": true, "rules": { "preset": "recommended" } },
   "overrides": [
