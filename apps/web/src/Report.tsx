@@ -55,6 +55,14 @@ export const SmallSampleNotice = ({ pages }: { readonly pages: number }) => {
   );
 };
 
+const writeFocus = (f: HeadToHeadFocus | null) => {
+  const query = new URLSearchParams(location.search);
+  query.delete("h2h");
+  const rest = query.toString();
+  const search = [f ? h2hQuery(f) : "", rest].filter(Boolean).join("&");
+  history.replaceState(history.state, "", `${location.pathname}${search ? `?${search}` : ""}${location.hash}`);
+};
+
 export const Report = ({
   run,
   presets,
@@ -184,6 +192,7 @@ export const Report = ({
         }
         h2h[a.id] = { ...h2h[a.id], [b.id]: r };
       }
+    if (focus === null && new URLSearchParams(location.search).has("h2h")) writeFocus(null);
     const stop = mountReport(el, {
       entries,
       pages,
@@ -195,11 +204,7 @@ export const Report = ({
       focus,
       onFocus: (f) => {
         setFocus(f);
-        const query = new URLSearchParams(location.search);
-        query.delete("h2h");
-        const rest = query.toString();
-        const search = [f ? h2hQuery(f) : "", rest].filter(Boolean).join("&");
-        history.replaceState(history.state, "", `${location.pathname}${search ? `?${search}` : ""}${location.hash}`);
+        writeFocus(f);
       },
     });
     const raf = requestAnimationFrame(() => setGrown(true));
