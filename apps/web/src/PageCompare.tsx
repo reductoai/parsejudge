@@ -705,15 +705,16 @@ export const PageCompare = ({
 
   const presetOf = (id: string) => presets.find((p) => p.id === id);
   const runProviders = run.presetIds.map((id) => presetOf(id)?.provider);
+  const runLabel = (id: string) => run.summary?.presets.find((p) => p.presetId === id)?.label ?? id;
   const name = (id: string) => {
     const preset = presetOf(id);
-    if (preset === undefined) return id;
+    if (preset === undefined) return runLabel(id);
     const siblings = runProviders.filter((p) => p === preset.provider).length;
     return siblings > 1 ? `${providerName(preset.provider)} · ${preset.mode}` : providerName(preset.provider);
   };
   const short = (id: string) => {
     const preset = presetOf(id);
-    if (preset === undefined) return id;
+    if (preset === undefined) return runLabel(id);
     const siblings = runProviders.filter((p) => p === preset.provider).length;
     return siblings > 1 ? preset.mode : (SHORT_NAMES[preset.provider] ?? preset.provider);
   };

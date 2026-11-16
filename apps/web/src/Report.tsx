@@ -86,7 +86,7 @@ export const Report = ({
   );
   const name = (id: string) => {
     const preset = byId.get(id);
-    if (!preset) return id;
+    if (!preset) return summary?.presets.find((p) => p.presetId === id)?.label ?? id;
     const siblings = run.presetIds.filter((other) => byId.get(other)?.provider === preset.provider).length;
     return siblings > 1 ? `${shortName(preset.provider)} ${preset.mode}` : shortName(preset.provider);
   };
