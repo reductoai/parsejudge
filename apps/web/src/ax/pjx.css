@@ -3114,6 +3114,14 @@
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
+.pjx .lb .rp-stat {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .pjx .lb .score-bar {
   flex: 1;
   height: 5px;
@@ -5450,7 +5458,7 @@
 
   .pjx .lb .thead,
   .pjx .lb .trow {
-    grid-template-columns: 14px minmax(0, 1fr) 84px 56px;
+    grid-template-columns: 14px minmax(0, 1fr) 84px 110px;
     min-width: 0;
   }
   .pjx .lb .who-n,
@@ -5460,10 +5468,10 @@
   .pjx .lb .thead .col-h-label {
     white-space: normal;
   }
-  .pjx .lb .thead > :nth-child(4),
+  .pjx .lb .thead > :nth-child(5),
   .pjx .lb .thead > :nth-child(6),
   .pjx .lb .thead > :nth-child(7),
-  .pjx .lb .trow > :nth-child(4),
+  .pjx .lb .trow > :nth-child(5),
   .pjx .lb .trow > :nth-child(6),
   .pjx .lb .trow > :nth-child(7) {
     display: none;
