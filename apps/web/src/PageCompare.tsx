@@ -813,7 +813,7 @@ export const PageCompare = ({
           onClose={() => setSharing(false)}
           onChange={(c) => {
             setRun({ ...run, ...c });
-            if (c.shareId !== run.shareId) navigate(pageUrl(c.shareId, pageId, view));
+            if (c.shareId !== run.shareId) navigate(pageUrl(c.shareId, pageId, view, h2hOn));
           }}
         />
       )}
