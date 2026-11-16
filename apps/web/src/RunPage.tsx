@@ -4,6 +4,7 @@ import { Icon } from "./ax/Icon.tsx";
 import { ContinueRun } from "./ContinueRun.tsx";
 import { CopyButton } from "./CopyButton.tsx";
 import { DeleteRun } from "./DeleteRun.tsx";
+import type { HeadToHeadFocus } from "./h2h.ts";
 import { Go, Shell } from "./Nav.tsx";
 import { presetTones, shortName } from "./names.ts";
 import { Report, SmallSampleNotice } from "./Report.tsx";
@@ -174,7 +175,7 @@ const Progress = ({
   );
 };
 
-export const RunPage = ({ shareId }: { readonly shareId: string }) => {
+export const RunPage = ({ shareId, h2h }: { readonly shareId: string; readonly h2h: HeadToHeadFocus | null }) => {
   const [run, setRun] = useState<Run | null>(null);
   const [presets, setPresets] = useState<Awaited<ReturnType<typeof api.presets>>>([]);
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +245,7 @@ export const RunPage = ({ shareId }: { readonly shareId: string }) => {
           <div className="es-title">This run failed: {run.error ?? "unknown error"}</div>
         </div>
       )}
-      {run && finished && <Report run={run} presets={presets} title={title} reveal={reveal} />}
+      {run && finished && <Report run={run} presets={presets} title={title} reveal={reveal} h2h={h2h} />}
       {run && live && <Progress run={run} presets={presets} onDone={load} />}
       {run && sharing && (
         <ShareDialog
@@ -253,10 +254,11 @@ export const RunPage = ({ shareId }: { readonly shareId: string }) => {
           visibility={run.visibility}
           shareContent={run.shareContent}
           owned={run.owned}
+          path={location.search}
           onClose={() => setSharing(false)}
           onChange={(c) => {
             setRun({ ...run, ...c });
-            if (c.shareId !== run.shareId) history.replaceState(null, "", `/r/${c.shareId}`);
+            if (c.shareId !== run.shareId) history.replaceState(null, "", `/r/${c.shareId}${location.search}`);
           }}
         />
       )}

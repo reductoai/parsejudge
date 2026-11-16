@@ -42,8 +42,9 @@ const App = () => {
   if (route.name === "terms" || route.name === "privacy") return <Legal doc={route.name} />;
   if (route.name === "signin") return <SignInPage next={route.next} />;
   if (route.name === "auth") return <SignInLink token={route.token} />;
-  if (route.name === "run") return <RunPage shareId={route.shareId} />;
-  if (route.name === "page") return <PageCompare shareId={route.shareId} pageId={route.pageId} view={route.view} />;
+  if (route.name === "run") return <RunPage shareId={route.shareId} h2h={route.h2h} />;
+  if (route.name === "page")
+    return <PageCompare shareId={route.shareId} pageId={route.pageId} view={route.view} h2h={route.h2h} />;
   return <Landing zdr={route.name === "landing" && route.zdr} />;
 };
 

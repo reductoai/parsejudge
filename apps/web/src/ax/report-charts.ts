@@ -3,6 +3,7 @@
    (range / line / distribution views, gap filter, head-to-head focus, page popover).
    `mountReport` builds into the report's own hosts and returns a cleanup. */
 import type { PageDetail } from "../api.ts";
+import { type HeadToHeadFocus, type Outcome, verb } from "../h2h.ts";
 
 export interface Entry {
   readonly id: string;
@@ -33,7 +34,6 @@ export interface PageRow {
   readonly mean: number;
 }
 
-type Outcome = "wins" | "ties" | "losses";
 export type HeadToHead = Readonly<Record<string, Readonly<Record<string, Readonly<Record<Outcome, ReadonlyArray<string>>>>>>>;
 
 export interface ReportData {
@@ -43,8 +43,12 @@ export interface ReportData {
   /** Page images and parser output are private to the owner. */
   readonly contentHidden: boolean;
   readonly detail: (pageId: string) => Promise<PageDetail | null>;
-  readonly compare: (pageId: string) => string;
+  /** The compare page for a page, filtered to the head-to-head focus when there is one. */
+  readonly compare: (pageId: string, focus: HeadToHeadFocus | null) => string;
   readonly navigate: (href: string) => void;
+  /** The head-to-head focus to open on, from the URL. */
+  readonly focus: HeadToHeadFocus | null;
+  readonly onFocus: (focus: HeadToHeadFocus | null) => void;
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -227,7 +231,6 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
 
   /* ---------- head to head ---------- */
   let h2hOn: string | null = null;
-  const ent = (id: string) => E.find((e) => e.id === id) as Entry;
   function h2h() {
     const head = `<tr><th></th>${E.map((e) => `<th>vs ${esc(e.provider)}</th>`).join("")}</tr>`;
     const rows = E.map(
@@ -244,18 +247,23 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
     $("h2h").innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody>`;
     for (const b of $("h2h").querySelectorAll<HTMLButtonElement>(".h2h-n"))
       b.onclick = () => {
-        const { a: ai = "", b: bi = "", k = "wins" } = b.dataset;
-        const key = ai + bi + k;
-        if (h2hOn === key) {
+        const { a = "", b: bi = "", k = "wins" } = b.dataset;
+        if (h2hOn === a + bi + k) {
           setFocus(null);
           return;
         }
-        const a = ent(ai);
-        const c = ent(bi);
-        const verb = k === "wins" ? "over" : k === "losses" ? "under" : "tied with";
-        setFocus({ key, ids: new Set(R.h2h[ai]?.[bi]?.[k as Outcome] ?? []), label: `${a.provider} ${verb} ${c.provider}` });
+        focusOn({ a, b: bi, outcome: k as Outcome });
         $("dgCard").scrollIntoView({ behavior: "smooth", block: "center" });
       };
+  }
+  /** Focuses the chart on one head-to-head cell; false when the run has no such pair or no pages in it. */
+  function focusOn(f: HeadToHeadFocus) {
+    const ids = R.h2h[f.a]?.[f.b]?.[f.outcome];
+    const a = E.find((e) => e.id === f.a);
+    const c = E.find((e) => e.id === f.b);
+    if (!ids?.length || !a || !c || R.contentHidden) return false;
+    setFocus({ key: f.a + f.b + f.outcome, ids: new Set(ids), label: `${a.provider} ${verb(f.outcome)} ${c.provider}`, h2h: f });
+    return true;
   }
 
   /* ============================================================
@@ -272,7 +280,7 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
   const pageNo = (pg: PageRow) => P.indexOf(pg) + 1;
   const st: {
     thr: number;
-    focus: { key: string; ids: Set<string>; label: string } | null;
+    focus: { key: string; ids: Set<string>; label: string; h2h: HeadToHeadFocus } | null;
     emph: string | null;
     sel: number;
     kb: number;
@@ -420,6 +428,7 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
   function setFocus(f: typeof st.focus) {
     st.focus = f;
     h2hOn = f ? f.key : null;
+    R.onFocus(f ? f.h2h : null);
     for (const b of root.querySelectorAll<HTMLButtonElement>(".h2h-n"))
       b.classList.toggle("is-on", !!f && (b.dataset.a ?? "") + (b.dataset.b ?? "") + (b.dataset.k ?? "") === f.key);
     $("dgFocus").innerHTML = f
@@ -1080,7 +1089,7 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
   const foot = (pg: PageRow) =>
     R.contentHidden
       ? ""
-      : `<div class="pp-foot"><span class="hint"></span><a class="btn" href="${esc(R.compare(pg.id))}" data-go><span class="btn-label">Compare outputs</span>${icon("arrow-up-right")}</a></div>`;
+      : `<div class="pp-foot"><span class="hint"></span><a class="btn" href="${esc(R.compare(pg.id, st.focus?.h2h ?? null))}" data-go><span class="btn-label">Compare outputs</span>${icon("arrow-up-right")}</a></div>`;
 
   function placePop(i: number) {
     const c = cols[i];
@@ -1109,7 +1118,7 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
       go.onclick = (e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey) return;
         e.preventDefault();
-        R.navigate(R.compare(pg.id));
+        R.navigate(R.compare(pg.id, st.focus?.h2h ?? null));
       };
     const t = pop.querySelector<HTMLElement>(".pp-thumb");
     if (t) {
@@ -1288,6 +1297,10 @@ export const mountReport = (root: HTMLElement, R: ReportData): (() => void) => {
   sortSeg();
   legend();
   build(true);
+  if (R.focus) {
+    if (focusOn(R.focus)) requestAnimationFrame(() => $("dgCard").scrollIntoView({ block: "center" }));
+    else R.onFocus(null);
+  }
   let rT: ReturnType<typeof setTimeout> | undefined;
   on(window, "resize", () => {
     clearTimeout(rT);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { type HeadToHeadFocus, readH2H } from "./h2h.ts";
 
 export type Route =
   | { readonly name: "landing"; readonly zdr: boolean }
@@ -10,8 +11,14 @@ export type Route =
   | { readonly name: "privacy" }
   | { readonly name: "signin"; readonly next: string }
   | { readonly name: "auth"; readonly token: string }
-  | { readonly name: "run"; readonly shareId: string }
-  | { readonly name: "page"; readonly shareId: string; readonly pageId: string; readonly view: "side" | "all" };
+  | { readonly name: "run"; readonly shareId: string; readonly h2h: HeadToHeadFocus | null }
+  | {
+      readonly name: "page";
+      readonly shareId: string;
+      readonly pageId: string;
+      readonly view: "side" | "all";
+      readonly h2h: HeadToHeadFocus | null;
+    };
 
 export const parse = (path: string, search: string): Route => {
   const page = /^\/r\/([^/]+)\/p\/([^/]+)$/.exec(path);
@@ -21,6 +28,7 @@ export const parse = (path: string, search: string): Route => {
       shareId: page[1],
       pageId: page[2],
       view: new URLSearchParams(search).get("view") === "all" ? "all" : "side",
+      h2h: readH2H(search),
     };
   if (path === "/account") return { name: "account" };
   if (path === "/runs") return { name: "runs" };
@@ -31,7 +39,7 @@ export const parse = (path: string, search: string): Route => {
   if (path === "/signin") return { name: "signin", next: new URLSearchParams(search).get("next") ?? "/" };
   if (path === "/auth") return { name: "auth", token: new URLSearchParams(search).get("token") ?? "" };
   const run = /^\/r\/([^/]+)$/.exec(path);
-  if (run?.[1]) return { name: "run", shareId: run[1] };
+  if (run?.[1]) return { name: "run", shareId: run[1], h2h: readH2H(search) };
   return { name: "landing", zdr: path === "/zdr" };
 };
 

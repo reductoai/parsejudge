@@ -2,6 +2,7 @@ import DOMPurify from "dompurify";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, type JudgedError, type PageDetail, type PageParse, type Preset, type Run } from "./api.ts";
 import { Icon } from "./ax/Icon.tsx";
+import { type HeadToHeadFocus, h2hMatch, h2hQuery, verb } from "./h2h.ts";
 import { parseMarkdown, renderMath, wrapRawMath } from "./math.ts";
 import { providerName, SHORT_NAMES } from "./names.ts";
 import { navigate } from "./router.ts";
@@ -31,7 +32,7 @@ interface PageStat {
   readonly scores: Readonly<Record<string, number | null>>;
 }
 
-type PageFilter = "all" | "flagged" | "high";
+type PageFilter = "all" | "flagged" | "high" | "h2h";
 interface PageSort {
   readonly key: string;
   readonly desc: boolean;
@@ -47,7 +48,9 @@ const FILTERS: ReadonlyArray<readonly [PageFilter, string]> = [
   ["flagged", "Flagged"],
   ["high", "High severity"],
 ];
-const inFilter = (filter: PageFilter) => (p: PageStat) => filter === "all" || (filter === "flagged" ? isFlagged(p) : p.high > 0);
+const inFilter = (filter: PageFilter, h2h: HeadToHeadFocus | null) => (p: PageStat) =>
+  filter === "all" ||
+  (filter === "flagged" ? isFlagged(p) : filter === "h2h" ? h2h !== null && h2hMatch(h2h, p.scores) : p.high > 0);
 const sortValue = (p: PageStat, key: string) => {
   if (key === "order") return p.order;
   if (key === "gap") return p.failed ? Number.POSITIVE_INFINITY : p.gap;
@@ -61,7 +64,10 @@ const bySort =
 const byScore = (a: PageParse, b: PageParse) => (b.score ?? -1) - (a.score ?? -1);
 const flagsOf = (parse: PageParse) =>
   (parse.errors ?? []).filter((e) => e.severity !== "not_error").sort((a, b) => RANK[a.severity] - RANK[b.severity]);
-const pageUrl = (shareId: string, pageId: string, view: View) => `/r/${shareId}/p/${pageId}${view === "all" ? "?view=all" : ""}`;
+const pageUrl = (shareId: string, pageId: string, view: View, h2h: HeadToHeadFocus | null = null) => {
+  const query = [view === "all" ? "view=all" : "", h2h ? h2hQuery(h2h) : ""].filter(Boolean).join("&");
+  return `/r/${shareId}/p/${pageId}${query ? `?${query}` : ""}`;
+};
 
 const pageStats = (run: Run): ReadonlyArray<PageStat> => {
   const cells = new Map<string, Array<Run["scores"][number]>>();
@@ -456,6 +462,8 @@ const DocPicker = ({
   presetIds,
   label,
   filter,
+  filters,
+  h2h,
   sort,
   onFilter,
   onSort,
@@ -467,6 +475,8 @@ const DocPicker = ({
   readonly presetIds: ReadonlyArray<string>;
   readonly label: (presetId: string) => string;
   readonly filter: PageFilter;
+  readonly filters: ReadonlyArray<readonly [PageFilter, string]>;
+  readonly h2h: HeadToHeadFocus | null;
   readonly sort: PageSort;
   readonly onFilter: (filter: PageFilter) => void;
   readonly onSort: (sort: PageSort) => void;
@@ -528,7 +538,7 @@ const DocPicker = ({
               }}
             />
             <div className="flex" style={{ gap: 6, marginTop: 12 }}>
-              {FILTERS.map(([key, text], i) => (
+              {filters.map(([key, text], i) => (
                 <Fragment key={key}>
                   {i > 0 && (
                     <span className="caret" aria-hidden="true">
@@ -543,7 +553,7 @@ const DocPicker = ({
                       setCursor(0);
                     }}
                   >
-                    {text} · {stats.filter(inFilter(key)).length}
+                    {text} · {stats.filter(inFilter(key, h2h)).length}
                   </button>
                 </Fragment>
               ))}
@@ -620,16 +630,20 @@ export const PageCompare = ({
   shareId,
   pageId,
   view,
+  h2h,
 }: {
   readonly shareId: string;
   readonly pageId: string;
   readonly view: View;
+  /** Head-to-head filter from the URL: the pages where one provider beat, tied or lost to another. */
+  readonly h2h: HeadToHeadFocus | null;
 }) => {
   const [run, setRun] = useState<Run | null>(null);
   const [sharing, setSharing] = useState(false);
   const [presets, setPresets] = useState<ReadonlyArray<Preset>>([]);
   const [detail, setDetail] = useState<PageDetail | null>(null);
   const [pair, setPair] = useState<ReadonlyArray<string>>(() => loadPair(shareId));
+  const [chosenPair, setChosenPair] = useState<ReadonlyArray<string> | null>(null);
   const zoom = useZoom();
 
   useEffect(() => {
@@ -644,6 +658,10 @@ export const PageCompare = ({
   }, [run, pageId]);
 
   const [chosenFilter, setFilter] = useState<PageFilter | null>(null);
+  const [pinned, setPinned] = useState(h2h);
+  useEffect(() => {
+    if (h2h !== null) setPinned(h2h);
+  }, [h2h]);
   const [sort, setSort] = useState<PageSort>({ key: "gap", desc: true });
   const [focus, setFocus] = useState<{ readonly presetId: string; readonly flag: number } | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new page clears the focused flag.
@@ -652,13 +670,20 @@ export const PageCompare = ({
   const stats = useMemo(() => (run === null ? [] : pageStats(run)), [run]);
   const position = stats.findIndex((p) => p.id === pageId);
   const current = stats[position];
-  const filter = chosenFilter ?? (current !== undefined && isFlagged(current) ? "flagged" : "all");
-  const sequence = useMemo(() => stats.filter(inFilter(filter)).sort(bySort(sort)), [stats, filter, sort]);
+  const matchup =
+    run !== null && pinned !== null && run.presetIds.includes(pinned.a) && run.presetIds.includes(pinned.b) ? pinned : null;
+  const filter =
+    chosenFilter === "h2h" && matchup === null
+      ? "all"
+      : (chosenFilter ??
+        (h2h !== null && matchup !== null ? "h2h" : current !== undefined && isFlagged(current) ? "flagged" : "all"));
+  const h2hOn = filter === "h2h" ? matchup : null;
+  const sequence = useMemo(() => stats.filter(inFilter(filter, matchup)).sort(bySort(sort)), [stats, filter, matchup, sort]);
   const at = sequence.findIndex((p) => p.id === pageId);
   const prev = at === -1 ? sequence.at(-1) : sequence[at - 1];
   const next = at === -1 ? sequence[0] : sequence[at + 1];
-  const filterName = FILTERS.find(([key]) => key === filter)?.[1] ?? "";
-  const go = (id: string | undefined, nextView: View = view) => id !== undefined && navigate(pageUrl(shareId, id, nextView));
+  const go = (id: string | undefined, nextView: View = view, focus: HeadToHeadFocus | null = h2hOn) =>
+    id !== undefined && navigate(pageUrl(shareId, id, nextView, focus));
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -693,18 +718,28 @@ export const PageCompare = ({
     return siblings > 1 ? preset.mode : (SHORT_NAMES[preset.provider] ?? preset.provider);
   };
 
+  const filters: ReadonlyArray<readonly [PageFilter, string]> =
+    matchup === null ? FILTERS : [...FILTERS, ["h2h", `${short(matchup.a)} ${verb(matchup.outcome)} ${short(matchup.b)}`]];
+  const filterName = filters.find(([key]) => key === filter)?.[1] ?? "";
+  const pickFilter = (f: PageFilter) => {
+    setFilter(f);
+    history.replaceState(history.state, "", pageUrl(shareId, pageId, view, f === "h2h" ? matchup : null));
+  };
+
   const parses = detail?.parses ?? [];
   const best = Math.max(...parses.map((p) => p.score ?? -1));
   const ranked = [...parses].sort(byScore);
   const ids = parses.map((p) => p.presetId);
-  const a = pair[0] !== undefined && ids.includes(pair[0]) ? pair[0] : ranked[0]?.presetId;
+  const shown = h2hOn !== null && chosenPair === null ? [h2hOn.a, h2hOn.b] : pair;
+  const a = shown[0] !== undefined && ids.includes(shown[0]) ? shown[0] : ranked[0]?.presetId;
   const b =
-    pair[1] !== undefined && ids.includes(pair[1]) && pair[1] !== a
-      ? pair[1]
+    shown[1] !== undefined && ids.includes(shown[1]) && shown[1] !== a
+      ? shown[1]
       : ranked.findLast((p) => p.presetId !== a)?.presetId;
   const choose = (slot: 0 | 1, id: string) => {
     const next = slot === 0 ? [id, b ?? ""] : [a ?? "", id];
     setPair(next);
+    setChosenPair(next);
     localStorage.setItem(pairKey(shareId), JSON.stringify(next));
   };
   const issues = parses.reduce((n, p) => n + flagsOf(p).length, 0);
@@ -713,6 +748,7 @@ export const PageCompare = ({
     const other = presetId === top ? ranked[1]?.presetId : top;
     const pairNext = presetId === top ? [presetId, other ?? ""] : [other ?? "", presetId];
     setPair(pairNext);
+    setChosenPair(pairNext);
     localStorage.setItem(pairKey(shareId), JSON.stringify(pairNext));
     setFocus(flag === null ? null : { presetId, flag });
     go(pageId, "side");
@@ -733,8 +769,10 @@ export const PageCompare = ({
             presetIds={run.presetIds}
             label={short}
             filter={filter}
+            filters={filters}
+            h2h={matchup}
             sort={sort}
-            onFilter={setFilter}
+            onFilter={pickFilter}
             onSort={setSort}
             onPick={(id) => go(id)}
           />
@@ -771,7 +809,7 @@ export const PageCompare = ({
           visibility={run.visibility}
           shareContent={run.shareContent}
           owned={run.owned}
-          path={pageUrl(run.shareId, pageId, view).slice(`/r/${run.shareId}`.length)}
+          path={pageUrl(run.shareId, pageId, view, h2hOn).slice(`/r/${run.shareId}`.length)}
           onClose={() => setSharing(false)}
           onChange={(c) => {
             setRun({ ...run, ...c });
