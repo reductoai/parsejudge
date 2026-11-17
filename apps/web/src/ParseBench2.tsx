@@ -11,7 +11,7 @@ import {
 import { currentUser } from "./api.ts";
 import { parseMarkdown, renderMath, wrapRawMath } from "./math.ts";
 import { Shell, SiteBar, SiteFoot } from "./Nav.tsx";
-import { PAGES, useTitle } from "./seo.ts";
+import { usePage } from "./seo.ts";
 import "./parsebench2.css";
 
 type Judge = {
@@ -494,7 +494,7 @@ export const ParseBench2 = () => {
   const [vend, setVend] = useState("");
   const hash = useHash();
   const pane = useRef<HTMLDivElement>(null);
-  useTitle(PAGES.parsebench2.title);
+  usePage("parsebench2");
   useEffect(() => {
     data.then(setPairs);
   }, []);

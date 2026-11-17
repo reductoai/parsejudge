@@ -43,12 +43,24 @@ export const PAGES = {
 
 export type PageKey = keyof typeof PAGES;
 
-/** Sets the tab title while a page is mounted, and puts the home page's title back after. */
-export const useTitle = (title: string) => {
+const applyPage = (key: PageKey) => {
+  const { path, title, description } = PAGES[key];
+  const href = `${SITE_URL}${path}`;
+  document.title = title;
+  const set = (selector: string, attr: string, value: string) => document.head.querySelector(selector)?.setAttribute(attr, value);
+  set('meta[name="description"]', "content", description);
+  set('meta[property="og:title"]', "content", title);
+  set('meta[property="og:description"]', "content", description);
+  set('meta[property="og:url"]', "content", href);
+  set('meta[name="twitter:title"]', "content", title);
+  set('meta[name="twitter:description"]', "content", description);
+  set('link[rel="canonical"]', "href", href);
+};
+
+/** Sets the title, description and canonical URL while a page is mounted, and puts the home page's back after. */
+export const usePage = (key: PageKey) => {
   useEffect(() => {
-    document.title = title;
-    return () => {
-      document.title = PAGES.landing.title;
-    };
-  }, [title]);
+    applyPage(key);
+    return () => applyPage("landing");
+  }, [key]);
 };

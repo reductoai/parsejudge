@@ -1,10 +1,10 @@
 import { currentUser } from "./api.ts";
 import { FAQS } from "./faq.ts";
 import { Shell, SiteBar, SiteFoot } from "./Nav.tsx";
-import { PAGES, useTitle } from "./seo.ts";
+import { usePage } from "./seo.ts";
 
 export const Faq = () => {
-  useTitle(PAGES.faq.title);
+  usePage("faq");
   return (
     <Shell topbar={<SiteBar user={currentUser()} />} label="FAQ">
       <div className="page md-page">
