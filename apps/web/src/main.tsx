@@ -14,6 +14,7 @@ const chunks = {
   account: () => import("./Account.tsx").then((m) => ({ default: m.Account })),
   runs: () => import("./Runs.tsx").then((m) => ({ default: m.Runs })),
   methodology: () => import("./Methodology.tsx").then((m) => ({ default: m.Methodology })),
+  faq: () => import("./Faq.tsx").then((m) => ({ default: m.Faq })),
   parsebench2: () => import("./ParseBench2.tsx").then((m) => ({ default: m.ParseBench2 })),
   legal: () => import("./Legal.tsx").then((m) => ({ default: m.Legal })),
   run: () => import("./RunPage.tsx").then((m) => ({ default: m.RunPage })),
@@ -28,6 +29,7 @@ const chunkOf = (route: Route): keyof typeof chunks | null =>
 const Account = lazy(chunks.account);
 const Runs = lazy(chunks.runs);
 const Methodology = lazy(chunks.methodology);
+const Faq = lazy(chunks.faq);
 const ParseBench2 = lazy(chunks.parsebench2);
 const Legal = lazy(chunks.legal);
 const RunPage = lazy(chunks.run);
@@ -38,6 +40,7 @@ const App = () => {
   if (route.name === "account") return <Account />;
   if (route.name === "runs") return <Runs />;
   if (route.name === "methodology") return <Methodology />;
+  if (route.name === "faq") return <Faq />;
   if (route.name === "parsebench2") return <ParseBench2 />;
   if (route.name === "terms" || route.name === "privacy") return <Legal doc={route.name} />;
   if (route.name === "signin") return <SignInPage next={route.next} />;

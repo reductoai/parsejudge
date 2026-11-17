@@ -11,6 +11,7 @@ import {
 import { currentUser } from "./api.ts";
 import { parseMarkdown, renderMath, wrapRawMath } from "./math.ts";
 import { Shell, SiteBar, SiteFoot } from "./Nav.tsx";
+import { PAGES, useTitle } from "./seo.ts";
 import "./parsebench2.css";
 
 type Judge = {
@@ -493,12 +494,9 @@ export const ParseBench2 = () => {
   const [vend, setVend] = useState("");
   const hash = useHash();
   const pane = useRef<HTMLDivElement>(null);
+  useTitle(PAGES.parsebench2.title);
   useEffect(() => {
-    document.title = "ParseBench-2 Examples · Parse Judge";
     data.then(setPairs);
-    return () => {
-      document.title = "Parse Judge";
-    };
   }, []);
   const id = /^#p(\d+)$/.exec(hash)?.[1];
   const current = id === undefined ? undefined : pairs.find((d) => String(d.id) === id);

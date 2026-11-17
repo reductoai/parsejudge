@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Parse Judge</title>
+    <title>Parse Judge: compare document parsers and OCR APIs on your own documents</title>
     <meta name="description" content="Compare document parsers on your own documents. A blind LLM judge scores every page. Free and open source." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Parse Judge" />
@@ -24,6 +24,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // A prerendered page is only for its own path; other routes start from an empty root.
+      (function () {
+        var root = document.getElementById("root");
+        if (root && root.dataset.path !== location.pathname) root.replaceChildren();
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

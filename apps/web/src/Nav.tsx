@@ -85,6 +85,7 @@ export const SiteBar = ({ user, active }: { readonly user?: string | null; reado
 
 export const SiteFoot = () => (
   <footer className="site-foot">
+    <Go to="/faq">FAQ</Go>
     <Go to="/terms">Terms</Go>
     <Go to="/privacy">Privacy</Go>
   </footer>

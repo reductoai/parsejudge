@@ -1,2 +1,8 @@
 User-agent: *
 Allow: /
+Disallow: /v1/
+Disallow: /blobs/
+Disallow: /oauth/
+Disallow: /auth
+
+Sitemap: https://parsejudge.com/sitemap.xml

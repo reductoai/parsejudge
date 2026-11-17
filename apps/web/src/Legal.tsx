@@ -1,9 +1,9 @@
 import { marked } from "marked";
-import { useEffect } from "react";
 import { currentUser } from "./api.ts";
 import privacy from "./legal/privacy.md?raw";
 import terms from "./legal/terms.md?raw";
 import { Shell, SiteBar, SiteFoot } from "./Nav.tsx";
+import { PAGES, useTitle } from "./seo.ts";
 
 const DOCS = {
   terms: { title: "Terms of Service", body: terms },
@@ -14,12 +14,7 @@ const UPDATED = "November 6, 2026";
 
 export const Legal = ({ doc }: { readonly doc: keyof typeof DOCS }) => {
   const { title, body } = DOCS[doc];
-  useEffect(() => {
-    document.title = `${title} · Parse Judge`;
-    return () => {
-      document.title = "Parse Judge";
-    };
-  }, [title]);
+  useTitle(PAGES[doc].title);
   return (
     <Shell topbar={<SiteBar user={currentUser()} />} label={title}>
       <div className="page md-page legal-page">

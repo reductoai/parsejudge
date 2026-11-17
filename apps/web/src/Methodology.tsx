@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { currentUser } from "./api.ts";
 import { BlindRequestFigure, SampleSizeFigure, SubsetFigure } from "./figures.tsx";
 import { Shell, SiteBar, SiteFoot } from "./Nav.tsx";
+import { PAGES, useTitle } from "./seo.ts";
 
 const SECTIONS = [
   ["why", "The trouble with vendor benchmarks"],
@@ -48,12 +49,7 @@ const useActive = () => {
 
 export const Methodology = () => {
   const active = useActive();
-  useEffect(() => {
-    document.title = "Methodology · Parse Judge";
-    return () => {
-      document.title = "Parse Judge";
-    };
-  }, []);
+  useTitle(PAGES.methodology.title);
   return (
     <Shell topbar={<SiteBar user={currentUser()} active="methodology" />} label="Methodology">
       <div className="page md-page">

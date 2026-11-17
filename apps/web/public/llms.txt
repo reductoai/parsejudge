@@ -1,0 +1,27 @@
+# Parse Judge
+
+> Parse Judge is a free, open-source tool for comparing document parsers and OCR APIs on your own documents. Every page is rendered to the same image and sent to each parser, and a blind vision-model judge, which never sees provider names, scores the outputs. Each run produces a report with scores, high-severity error rates, page-by-page head-to-head results, list price per 1,000 pages and latency.
+
+- Input: PDF, DOCX and PPTX files, or a .zip of them, up to 1,000 pages per run.
+- Parsers: Azure Document Intelligence, AWS Textract, Cohere, Datalab, Extend, Google Document AI, LlamaParse, Mistral OCR, Nutrient, Pulse and Reducto. Some run on the site's credentials; the others need the user's own API key. `GET https://parsejudge.com/v1/presets` lists every preset with its list price.
+- Scoring: one judge request per page with the page image and every output under neutral labels (parse_a, parse_b, ...). The judge lists errors with a severity and category, then scores each output from 1 (empty or mostly wrong) to 10 (no errors found).
+- Sample size: runs under about 100 pages are a test of the setup, not a result.
+- License: Apache-2.0. The judge prompt and scoring code are in the public repository.
+
+## Docs
+
+- [Methodology](https://parsejudge.com/methodology): how pages are rendered, parsed and judged, what a report shows, how to check the judge, and known limits
+- [FAQ](https://parsejudge.com/faq): short answers on scoring, supported parsers, limits, data handling, self-hosting and agent access
+- [ParseBench-2 examples](https://parsejudge.com/parsebench-2): pages where ParseBench-2 scores and a page-level review disagree, shown side by side
+
+## API
+
+- [MCP server](https://parsejudge.com/mcp): query and start runs from Claude, Cursor or any MCP client (`claude mcp add --transport http parsejudge https://parsejudge.com/mcp`)
+- [OpenAPI document](https://parsejudge.com/openapi.json): the HTTP API for uploads, runs and results
+- [Presets](https://parsejudge.com/v1/presets): every parser preset with its list price per page
+
+## Optional
+
+- [Source code](https://github.com/reductoai/parsejudge): provider adapters, judge prompt, scoring and self-hosting instructions
+- [Terms of Service](https://parsejudge.com/terms)
+- [Privacy Policy](https://parsejudge.com/privacy)

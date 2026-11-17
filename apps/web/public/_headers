@@ -1,0 +1,11 @@
+# Run reports, account pages and sign-in links are per-user; keep them out of search results.
+/r/*
+  X-Robots-Tag: noindex
+/runs
+  X-Robots-Tag: noindex
+/account
+  X-Robots-Tag: noindex
+/signin
+  X-Robots-Tag: noindex
+/auth
+  X-Robots-Tag: noindex
