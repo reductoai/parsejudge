@@ -3632,6 +3632,7 @@
   z-index: 10040;
   width: 560px;
   max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
   background: white;
   border: 0.5px solid var(--grey-200);
   border-radius: 10px;
@@ -3720,7 +3721,15 @@
   gap: 16px;
   padding: 14px;
 }
+.pjx .pg-pop > .pp-head,
+.pjx .pg-pop > .pp-foot {
+  flex-shrink: 0;
+}
 .pjx .pp-swap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   transition:
     opacity var(--dur-fade) var(--ease-standard),
     transform var(--dur-fade) var(--ease-out);
