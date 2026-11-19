@@ -133,7 +133,7 @@ const BUILTIN_PRESETS: ReadonlyArray<Preset> = [
     label: "LlamaParse Agentic Plus",
     mode: "Agentic Plus",
     config: llamaparse("agentic_plus"),
-    listPriceUsdPerPage: 45 * 0.00125,
+    listPriceUsdPerPage: 25 * 0.00125,
     hosted: false,
   },
   {
