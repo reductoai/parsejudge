@@ -19,17 +19,28 @@ export const SPLIT_IN_WORKER_MAX_BYTES = 5 * 1024 * 1024;
 
 const unavailable = (error: unknown) => new SplitterUnavailable({ message: String(error) });
 
-/** Splits `pdf` in the container and runs `onPage` on each page as it arrives. Returns the page count. */
+/**
+ * Splits the PDF in the container and runs `onPage` on each page as it arrives. Returns the page count. `pdf` is a
+ * stream of `size` bytes (an R2 object body), so the Worker never holds the whole file.
+ */
 export const splitInContainer = <E>(
   env: Env,
-  pdf: Uint8Array,
+  pdf: ReadableStream<Uint8Array>,
+  size: number,
   maxPages: number,
   onPage: (index: number, page: Uint8Array) => Effect.Effect<void, E>,
 ) =>
   Effect.gen(function* () {
     const splitter = yield* Effect.tryPromise({ try: () => getRandom(env.SPLITTER, INSTANCES), catch: unavailable });
     const response = yield* Effect.tryPromise({
-      try: () => splitter.fetch(new Request(`http://splitter/split?max=${maxPages}`, { method: "POST", body: pdf })),
+      try: () =>
+        splitter.fetch(
+          new Request(`http://splitter/split?max=${maxPages}`, {
+            method: "POST",
+            headers: { "content-length": String(size) },
+            body: pdf,
+          }),
+        ),
       catch: unavailable,
     });
     if (response.status === 422) {

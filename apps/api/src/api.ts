@@ -1,27 +1,17 @@
 import { env } from "cloudflare:workers";
-import {
-  DEFAULT_PRESET_IDS,
-  decodeJson,
-  ErrorCategory,
-  findPreset,
-  JUDGE_VERSION,
-  PRESETS,
-  sniffFormat,
-  splitPages,
-} from "@parsejudge/core";
+import { DEFAULT_PRESET_IDS, decodeJson, ErrorCategory, findPreset, JUDGE_VERSION, PRESETS } from "@parsejudge/core";
 import { Cause, Data, Effect, Layer, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiMiddleware } from "effect/http-api";
 import { PENDING_USER, pendingLogin, sessionUser } from "./auth.ts";
 import { signedBlobUrl } from "./blobs.ts";
-import { toPdf } from "./converter.ts";
 import { encryptCredentials } from "./credentials.ts";
 import { deleteRun, deleteUser } from "./deletion.ts";
 import type { Env } from "./env.ts";
+import { ingestUpload } from "./ingest.ts";
 import { INTERNAL_HEADER, internalUser } from "./internal.ts";
-import { documentKey, markdownKey, pageId as pageIdOf, pagePdfKey, pagePngKey, sourceKey } from "./keys.ts";
+import { markdownKey, pageId as pageIdOf, pagePdfKey, pagePngKey, uploadKey } from "./keys.ts";
 import { continueRun, reconcileRun } from "./run.ts";
-import { SPLIT_IN_WORKER_MAX_BYTES, splitInContainer } from "./splitter.ts";
 import { generateTitle } from "./title.ts";
 
 const cf = env as unknown as Env;
@@ -216,6 +206,16 @@ class BadRequest extends Schema.TaggedError<BadRequest>()("BadRequest", { error:
 class Unauthorized extends Schema.TaggedError<Unauthorized>()("Unauthorized", { error: Schema.String }, { httpApiStatus: 401 }) {}
 class NotFound extends Schema.TaggedError<NotFound>()("NotFound", { error: Schema.String }, { httpApiStatus: 404 }) {}
 class Conflict extends Schema.TaggedError<Conflict>()("Conflict", { error: Schema.String }, { httpApiStatus: 409 }) {}
+class LengthRequired extends Schema.TaggedError<LengthRequired>()(
+  "LengthRequired",
+  { error: Schema.String },
+  { httpApiStatus: 411 },
+) {}
+class PayloadTooLarge extends Schema.TaggedError<PayloadTooLarge>()(
+  "PayloadTooLarge",
+  { error: Schema.String },
+  { httpApiStatus: 413 },
+) {}
 class TooManyRequests extends Schema.TaggedError<TooManyRequests>()(
   "TooManyRequests",
   { error: Schema.String },
@@ -258,7 +258,7 @@ export const Api = HttpApi.make("parsejudge")
             zdr: Schema.optional(Schema.String),
           },
           success: Schema.Struct({ documentId: Schema.String, pageCount: Schema.Number }),
-          error: [BadRequest, Unauthorized, TooManyRequests, ServiceUnavailable],
+          error: [BadRequest, Unauthorized, LengthRequired, PayloadTooLarge, TooManyRequests, ServiceUnavailable],
         }),
       )
       .add(
@@ -452,11 +452,6 @@ export const canOpenRun = (runId: string) =>
     return (row.visibility === "link" && row.share_content === 1) || (yield* signedInUser) === row.user_id;
   });
 
-const sha256 = (bytes: Uint8Array) =>
-  Effect.promise(() => crypto.subtle.digest("SHA-256", bytes)).pipe(
-    Effect.map((digest) => [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("")),
-  );
-
 type RunRow = {
   id: string;
   share_id: string;
@@ -592,9 +587,6 @@ const PresetsLive = HttpApiBuilder.group(Api, "presets", (handlers) =>
   ),
 );
 
-/** Pages from the splitter stored to R2 in parallel at a time. */
-const PUT_BATCH = 32;
-
 const splitFailed = (documentId: string, message: string) =>
   Effect.logError("PDF split in container failed", documentId, message).pipe(
     Effect.andThen(Effect.fail(new ServiceUnavailable({ error: "Could not split this PDF. Retry in a minute." }))),
@@ -604,11 +596,30 @@ const overCap = new BadRequest({
   error: "Uploads before sign-in are limited to one run's pages. Sign in to upload more.",
 });
 
+/** Deletes an upload's blobs after it failed, 1,000 keys per call (R2's limit); a failure is logged, not thrown. */
+const removeBlobs = (documentId: string, keys: ReadonlyArray<string>) =>
+  Effect.forEach(
+    Array.from({ length: Math.ceil(keys.length / 1000) }, (_, i) => keys.slice(i * 1000, (i + 1) * 1000)),
+    (chunk) => query(() => cf.BLOBS.delete(chunk)),
+    { discard: true },
+  ).pipe(Effect.catch(() => Effect.logError("Upload cleanup failed", documentId)));
+
 const DocumentsLive = HttpApiBuilder.group(Api, "documents", (handlers) =>
   handlers
     .handle("upload", ({ query: { filename, upload, zdr } }) =>
       Effect.gen(function* () {
         const { userId, loginId } = yield* uploader;
+        const request = yield* HttpServerRequest.HttpServerRequest;
+        // The body streams to R2 as it arrives; R2 needs its length up front.
+        const body = (request.source as Request).body;
+        const size = Number(request.headers["content-length"] ?? Number.NaN);
+        if (body === null || !Number.isSafeInteger(size)) {
+          return yield* new LengthRequired({ error: "Send the file as the request body, with a content-length header." });
+        }
+        const maxBytes = cf.MAX_UPLOAD_BYTES === undefined ? Number.POSITIVE_INFINITY : Number(cf.MAX_UPLOAD_BYTES);
+        if (size > maxBytes) {
+          return yield* new PayloadTooLarge({ error: `Files are limited to ${Math.floor(maxBytes / 1024 / 1024)} MB.` });
+        }
         if (loginId !== null) {
           // Cheap checks before conversion; the insert below re-checks the cap atomically.
           const limiter = cf.UPLOAD_LIMIT;
@@ -621,101 +632,75 @@ const DocumentsLive = HttpApiBuilder.group(Api, "documents", (handlers) =>
           );
           if ((held?.pages ?? 0) >= Number(cf.MAX_PAGES_PER_RUN)) return yield* overCap;
         }
-        const request = yield* HttpServerRequest.HttpServerRequest;
-        const bytes = new Uint8Array(
-          yield* request.arrayBuffer.pipe(Effect.mapError(() => new BadRequest({ error: "Could not read the request body." }))),
-        );
-        const format = yield* sniffFormat(bytes);
-        const pdf = yield* toPdf(cf, format, bytes).pipe(
-          Effect.catchTag("ConverterUnavailable", (error) =>
-            Effect.logError("Document conversion failed", error.message).pipe(
-              Effect.andThen(
-                Effect.fail(new ServiceUnavailable({ error: "Document conversion is unavailable. Retry in a minute." })),
-              ),
+        const documentId = crypto.randomUUID();
+        const source = uploadKey(documentId);
+        const max = Number(cf.MAX_PAGES_PER_RUN);
+        yield* Effect.tryPromise(() => cf.BLOBS.put(source, body.pipeThrough(new FixedLengthStream(size)))).pipe(
+          Effect.catch((error) =>
+            Effect.logError("Storing upload failed", documentId, error.cause).pipe(
+              Effect.andThen(removeBlobs(documentId, [source])),
+              // Usually R2; a client that hung up mid-body never sees this response anyway.
+              Effect.andThen(Effect.fail(new ServiceUnavailable({ error: "Could not store the upload. Retry the request." }))),
             ),
           ),
         );
-        const documentId = crypto.randomUUID();
-        const max = Number(cf.MAX_PAGES_PER_RUN);
-        // Large PDFs are split in a container, which streams pages back; they are stored PUT_BATCH at a time.
-        let seen = 0;
-        const batch: Array<readonly [number, Uint8Array]> = [];
-        const flush = Effect.suspend(() =>
-          Effect.forEach(
-            batch.splice(0),
-            ([index, page]) => query(() => cf.BLOBS.put(pagePdfKey(pageIdOf(documentId, index)), page)),
-            { concurrency: "unbounded", discard: true },
-          ),
-        );
-        const pages =
-          pdf.byteLength <= SPLIT_IN_WORKER_MAX_BYTES
-            ? yield* splitPages(pdf, max)
-            : yield* splitInContainer(cf, pdf, max, (index, page) => {
-                batch.push([index, page]);
-                seen = index + 1;
-                return batch.length >= PUT_BATCH ? flush : Effect.void;
-              }).pipe(
-                Effect.tap(() => flush),
-                Effect.map((count) => ({ length: count, inContainer: true as const })),
-                Effect.onError(() =>
-                  query(() =>
-                    cf.BLOBS.delete(Array.from({ length: seen }, (_, index) => pagePdfKey(pageIdOf(documentId, index)))),
-                  ).pipe(Effect.catch(() => Effect.logError("Split cleanup failed", documentId))),
+        const ingested = yield* ingestUpload(cf, documentId, source, size, max).pipe(
+          Effect.onError(() => removeBlobs(documentId, [source])),
+          Effect.catchTags({
+            ConverterUnavailable: (error) =>
+              Effect.logError("Document conversion failed", error.message).pipe(
+                Effect.andThen(
+                  Effect.fail(new ServiceUnavailable({ error: "Document conversion is unavailable. Retry in a minute." })),
                 ),
-                Effect.catchTags({
-                  SplitterUnavailable: (error) => splitFailed(documentId, error.message),
-                  FramesBroken: (error) => splitFailed(documentId, error.message),
-                }),
-              );
+              ),
+            SplitterUnavailable: (error) => splitFailed(documentId, error.message),
+            FramesBroken: (error) => splitFailed(documentId, error.message),
+            StorageFailed: (error) => storageUnavailable(error.message),
+          }),
+        );
+        const { format, pdfKey, pageCount, sha256 } = ingested;
         const blobKeys = [
-          sourceKey(documentId, format),
-          documentKey(documentId),
-          ...Array.from({ length: pages.length }, (_, index) => pagePdfKey(pageIdOf(documentId, index))),
+          source,
+          ...(pdfKey === source ? [] : [pdfKey]),
+          ...Array.from({ length: pageCount }, (_, index) => pagePdfKey(pageIdOf(documentId, index))),
         ];
-        const hash = yield* sha256(bytes);
-        const store = query(() => cf.BLOBS.put(sourceKey(documentId, format), bytes)).pipe(
-          Effect.andThen(query(() => cf.BLOBS.put(documentKey(documentId), pdf))),
-          // Before sign-in completes, one check-and-insert caps the pages a login holds (one run) and the pages
-          // waiting under all open logins from its client (two runs), so parallel uploads cannot pass the cap together.
-          Effect.andThen(
-            query(() =>
-              cf.DB.prepare(
-                // A sign-in that completes while this upload runs has already set logins.user_id; the upload goes to that user.
-                `INSERT INTO documents (id, user_id, login_id, filename, format, sha256, page_count, created_at, upload_id, zdr)
-             SELECT ?1, COALESCE((SELECT user_id FROM logins WHERE id = ?2), ?3), ?2, ?4, ?5, ?6, ?7, ?8, ?11, ?12
+        // Before sign-in completes, one check-and-insert caps the pages a login holds (one run) and the pages
+        // waiting under all open logins from its client (two runs), so parallel uploads cannot pass the cap together.
+        const store = query(() =>
+          cf.DB.prepare(
+            // A sign-in that completes while this upload runs has already set logins.user_id; the upload goes to that user.
+            `INSERT INTO documents (id, user_id, login_id, filename, format, sha256, page_count, created_at, upload_id, zdr,
+                                    source_key, pdf_key)
+             SELECT ?1, COALESCE((SELECT user_id FROM logins WHERE id = ?2), ?3), ?2, ?4, ?5, ?6, ?7, ?8, ?11, ?12, ?13, ?14
              WHERE ?2 IS NULL OR (
                (SELECT COALESCE(SUM(page_count), 0) FROM documents WHERE login_id = ?2) + ?7 <= ?9 AND
                (SELECT COALESCE(SUM(page_count), 0) FROM documents WHERE user_id = ?10 AND login_id IN
                  (SELECT id FROM logins WHERE ip = (SELECT ip FROM logins WHERE id = ?2))) + ?7 <= ?9 * 2
              )`,
-              )
-                .bind(
-                  documentId,
-                  loginId,
-                  userId,
-                  filename ?? `document.${format}`,
-                  format,
-                  hash,
-                  pages.length,
-                  Date.now(),
-                  max,
-                  PENDING_USER,
-                  loginId === null ? (upload ?? null) : null,
-                  zdr === "1" ? 1 : 0,
-                )
-                .run(),
-            ),
-          ),
+          )
+            .bind(
+              documentId,
+              loginId,
+              userId,
+              filename ?? `document.${format}`,
+              format,
+              sha256,
+              pageCount,
+              Date.now(),
+              max,
+              PENDING_USER,
+              loginId === null ? (upload ?? null) : null,
+              zdr === "1" ? 1 : 0,
+              source,
+              pdfKey,
+            )
+            .run(),
+        ).pipe(
           Effect.flatMap((inserted) => (inserted.meta.changes === 1 ? Effect.void : Effect.fail(overCap))),
-          Effect.andThen(
-            "inContainer" in pages
-              ? Effect.void
-              : query(() => Promise.all(pages.map((page, index) => cf.BLOBS.put(pagePdfKey(pageIdOf(documentId, index)), page)))),
-          ),
           Effect.andThen(
             query(() =>
               cf.DB.batch(
-                Array.from({ length: pages.length }, (_, index) =>
+                Array.from({ length: pageCount }, (_, index) =>
                   cf.DB.prepare("INSERT OR IGNORE INTO pages (id, document_id, page_index, rendered) VALUES (?, ?, ?, 0)").bind(
                     pageIdOf(documentId, index),
                     documentId,
@@ -730,7 +715,7 @@ const DocumentsLive = HttpApiBuilder.group(Api, "documents", (handlers) =>
           // Remove whatever was written, so a failed upload leaves no blobs or rows behind.
           Effect.onError(() =>
             Effect.all([
-              query(() => cf.BLOBS.delete(blobKeys)),
+              removeBlobs(documentId, blobKeys),
               query(() =>
                 cf.DB.batch([
                   cf.DB.prepare("DELETE FROM pages WHERE document_id = ?").bind(documentId),
@@ -740,13 +725,13 @@ const DocumentsLive = HttpApiBuilder.group(Api, "documents", (handlers) =>
             ]).pipe(Effect.catch(() => Effect.logError("Upload cleanup failed", documentId))),
           ),
         );
-        yield* createWorkflow(cf.DOCUMENT_WORKFLOW, documentId, { documentId, pageCount: pages.length }).pipe(
+        yield* createWorkflow(cf.DOCUMENT_WORKFLOW, documentId, { documentId, pageCount }).pipe(
           // It only renders page images ahead of a run; each PageWorkflow renders its own page if this never ran.
           Effect.catchTag("WorkflowNotStarted", (error) =>
             Effect.logError("Document workflow not started", documentId, error.cause),
           ),
         );
-        return { documentId, pageCount: pages.length };
+        return { documentId, pageCount };
       }).pipe(Effect.catchTag("InvalidDocument", (error) => Effect.fail(new BadRequest({ error: error.message })))),
     )
     .handle("uploaded", ({ query: { upload } }) =>
