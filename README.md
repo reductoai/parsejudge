@@ -58,7 +58,8 @@ providers without editing this repo: bundle the Worker with `#plugins` aliased t
 
 ## Run locally
 
-Requirements: Node 22+, pnpm 10, Docker (Wrangler builds the conversion containers) and
+Requirements: Node 24.22+ (`.nvmrc`; 22.23+ also works, earlier versions fail the API tests), pnpm 10,
+Docker (Wrangler builds the conversion containers) and
 [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
 
 ```sh
