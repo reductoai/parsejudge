@@ -240,8 +240,19 @@ const judgeWith = Effect.fn("judge.model")(function* (config: JudgeConfig, model
   for (const evaluation of parsed.evaluations) {
     const presetId = labelToPreset[evaluation.label];
     if (presetId === undefined) continue;
+    if (verdicts.has(presetId)) {
+      return yield* new JudgeError({ retryable: true, message: `Duplicate judge label: ${evaluation.label}` });
+    }
     if (!Number.isInteger(evaluation.score) || evaluation.score < 1 || evaluation.score > 10) {
       return yield* new JudgeError({ retryable: true, message: `Judge score out of range: ${evaluation.score}` });
+    }
+    if (
+      evaluation.errors.some((error) => {
+        const figure = error.category === "figure_precision" || error.category === "figure_recall";
+        return figure !== (error.severity === "figure_error");
+      })
+    ) {
+      return yield* new JudgeError({ retryable: true, message: "Invalid judge error severity for its category." });
     }
     verdicts.set(presetId, {
       presetId,
