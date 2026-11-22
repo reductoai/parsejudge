@@ -1,0 +1,12 @@
+# The container images pin their base images by digest and the splitter locks its npm dependencies, so nothing
+# changes on a rebuild. Dependabot opens PRs to move them forward instead.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directories: ["/containers/splitter", "/containers/libreoffice"]
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /containers/splitter
+    schedule:
+      interval: weekly
