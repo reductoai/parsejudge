@@ -128,6 +128,20 @@ const BUILTIN_PRESETS: ReadonlyArray<Preset> = [
     hosted: false,
   },
   {
+    id: "extend_auto",
+    provider: "extend",
+    label: "Extend Auto",
+    mode: "Auto",
+    config: {
+      engine: "parse_auto",
+      target: "markdown",
+      chunkingStrategy: { type: "page" },
+      blockOptions: { figures: { enabled: true }, tables: { enabled: true, targetFormat: "html" } },
+    },
+    listPriceUsdPerPage: 0.02,
+    hosted: false,
+  },
+  {
     id: "llamaparse_agentic_plus",
     provider: "llamaparse",
     label: "LlamaParse Agentic Plus",
