@@ -1,7 +1,8 @@
 import { Effect, Option, Schema } from "effect";
 import { HttpClientRequest } from "effect/http";
+import type { Rect, SourceBox } from "../boxes.ts";
 import { decodeBody, sendJson } from "../http.ts";
-import { joinNonEmpty, number, record } from "../json.ts";
+import { array, joinNonEmpty, number, record, string } from "../json.ts";
 import { credential, jobFailure, type ParseOutput, type ProviderAdapter, pending } from "../provider.ts";
 
 const BASE_URL = "https://platform.reducto.ai";
@@ -18,19 +19,42 @@ const Parsed = Schema.Struct({
 
 const request = (key: string, req: HttpClientRequest.HttpClientRequest) => req.pipe(HttpClientRequest.bearerToken(key));
 
-const output = Effect.fn("reducto.output")(function* (raw: unknown) {
-  const { result } = yield* decodeBody("reducto", Parsed, raw);
-  const chunks =
-    "url" in result
-      ? yield* decodeBody("reducto", Chunks, (yield* sendJson("reducto", HttpClientRequest.get(result.url))).body)
-      : result.chunks;
-  const credits = number(record(record(raw).usage).credits);
+const output = Effect.fn("reducto.output")(function* (response: unknown) {
+  const { result } = yield* decodeBody("reducto", Parsed, response);
+  const fetched = "url" in result ? (yield* sendJson("reducto", HttpClientRequest.get(result.url))).body : undefined;
+  const chunks = "url" in result ? yield* decodeBody("reducto", Chunks, fetched) : result.chunks;
+  const credits = number(record(record(response).usage).credits);
+  // The chunks behind a URL go into `raw` too: the URL expires, and `boxes` reads them later.
+  const raw = fetched === undefined ? response : { ...record(response), result: { type: "full", chunks: fetched } };
   return {
     markdown: joinNonEmpty(chunks.map((chunk) => chunk.content)),
     raw,
     ...(credits === undefined ? {} : { reportedCost: { usd: credits * CREDIT_USD, source: "provider" } }),
   } satisfies ParseOutput;
 });
+
+const rect = (value: unknown): Rect | undefined => {
+  const box = record(value);
+  const [left, top, width, height] = [number(box.left), number(box.top), number(box.width), number(box.height)];
+  return left === undefined || top === undefined || width === undefined || height === undefined
+    ? undefined
+    : { left, top, width, height };
+};
+
+/** Each block's cited words when the preset asks for `return_citations`, otherwise the block's own box. */
+const boxes = (raw: unknown): ReadonlyArray<SourceBox> =>
+  array(record(record(raw).result).chunks)
+    .flatMap((chunk) => array(record(chunk).blocks))
+    .flatMap((value) => {
+      const block = record(value);
+      const words = array(record(block.extra).word_citations).map(record);
+      const parts = words.length > 0 ? words.map((w) => [w.text, w.bbox] as const) : [[block.content, block.bbox] as const];
+      return parts.flatMap(([text, bbox]) => {
+        const box = rect(bbox);
+        const content = string(text);
+        return box === undefined || content === undefined ? [] : [{ text: content, ...box }];
+      });
+    });
 
 export const reducto: ProviderAdapter = {
   id: "reducto",
@@ -53,4 +77,5 @@ export const reducto: ProviderAdapter = {
     if (status !== "Completed") return yield* jobFailure("reducto", status, reason);
     return Option.some(yield* output(record(response.body).result));
   }),
+  boxes,
 };

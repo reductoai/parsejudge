@@ -502,12 +502,23 @@ body {
   cursor: grabbing;
   user-select: none;
 }
+.zoom-page {
+  margin: 0 auto;
+  position: relative;
+}
 .zoom-view img {
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
   display: block;
-  margin: 0 auto;
   max-width: none;
+  width: 100%;
+}
+.source-box {
+  border: 1.5px solid var(--bad);
+  border-radius: 2px;
+  box-sizing: border-box;
+  pointer-events: none;
+  position: absolute;
 }
 .pc-cols {
   display: grid;

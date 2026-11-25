@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import {
+  adapterFor,
   DEFAULT_PRESET_IDS,
   decodeJson,
   ErrorCategory,
@@ -19,7 +20,7 @@ import { encryptCredentials } from "./credentials.ts";
 import { deleteRun, deleteUser } from "./deletion.ts";
 import type { Env } from "./env.ts";
 import { INTERNAL_HEADER, internalUser } from "./internal.ts";
-import { documentKey, markdownKey, pageId as pageIdOf, pagePdfKey, pagePngKey, sourceKey } from "./keys.ts";
+import { documentKey, markdownKey, pageId as pageIdOf, pagePdfKey, pagePngKey, rawKey, sourceKey } from "./keys.ts";
 import { continueRun, reconcileRun } from "./run.ts";
 import { SPLIT_IN_WORKER_MAX_BYTES, splitInContainer } from "./splitter.ts";
 import { generateTitle } from "./title.ts";
@@ -207,6 +208,18 @@ const PageDetail = Schema.Struct({
       score: Schema.NullOr(Schema.Number),
       reasoning: Schema.NullOr(Schema.String),
       errors: Schema.Unknown,
+      /** The output's text with its boxes on the page, for providers that return them. */
+      boxes: Schema.NullOr(
+        Schema.Array(
+          Schema.Struct({
+            text: Schema.String,
+            left: Schema.Number,
+            top: Schema.Number,
+            width: Schema.Number,
+            height: Schema.Number,
+          }),
+        ),
+      ),
     }),
   ),
 });
@@ -364,6 +377,17 @@ const storageUnavailable = (cause: unknown) =>
 /** A D1, R2, Workflows or rate-limiter call. A rejection is logged and becomes ServiceUnavailable. */
 const query = <A>(promise: () => Promise<A>) =>
   Effect.tryPromise(promise).pipe(Effect.catch((error) => storageUnavailable(error.cause)));
+
+/** A parse's boxes on the page, read from its stored provider response. Null when the provider returns none. */
+const boxesOf = (runId: string, pageId: string, presetId: string, status: string) => {
+  const read = adapterFor(findPreset(presetId)?.provider ?? presetId).boxes;
+  if (read === undefined || status !== "succeeded") return Effect.succeed(null);
+  return query(() => cf.BLOBS.get(rawKey(runId, pageId, presetId))).pipe(
+    Effect.flatMap((object) =>
+      object === null ? Effect.succeed(null) : query(() => object.json<unknown>()).pipe(Effect.map(read)),
+    ),
+  );
+};
 
 /** An Effect of storage calls (auth, deletion). Any failure or defect is logged and becomes ServiceUnavailable. */
 const stored = <A, E>(effect: Effect.Effect<A, E>) =>
@@ -1121,8 +1145,9 @@ const RunsLive = HttpApiBuilder.group(Api, "runs", (handlers) =>
                 Effect.flatMap((object) => (object === null ? Effect.succeed(null) : query(() => object.text()))),
               ),
               withQuotes(row.errors, row.quotes),
+              boxesOf(params.runId, params.pageId, row.preset_id, row.status),
             ]).pipe(
-              Effect.map(([markdown, errors]) => ({
+              Effect.map(([markdown, errors, boxes]) => ({
                 presetId: row.preset_id,
                 status: row.status,
                 latencyMs: row.latency_ms,
@@ -1133,6 +1158,7 @@ const RunsLive = HttpApiBuilder.group(Api, "runs", (handlers) =>
                 score: row.score,
                 reasoning: row.reasoning,
                 errors,
+                boxes,
               })),
             ),
           { concurrency: "unbounded" },

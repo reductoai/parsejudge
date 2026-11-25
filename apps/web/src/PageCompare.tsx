@@ -1,5 +1,6 @@
+import { boxesFor } from "@parsejudge/core/boxes";
 import DOMPurify from "dompurify";
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, type JudgedError, type PageDetail, type PageParse, type Preset, type Run } from "./api.ts";
 import { Icon } from "./ax/Icon.tsx";
 import { type HeadToHeadFocus, h2hMatch, h2hQuery, verb } from "./h2h.ts";
@@ -7,7 +8,7 @@ import { parseMarkdown, renderMath, wrapRawMath } from "./math.ts";
 import { providerName, SHORT_NAMES } from "./names.ts";
 import { navigate } from "./router.ts";
 import { ShareDialog } from "./Share.tsx";
-import { useZoom, ZoomControls, ZoomImage } from "./ZoomImage.tsx";
+import { type PageFocus, useZoom, ZoomControls, ZoomImage } from "./ZoomImage.tsx";
 
 type View = "side" | "all";
 type Severity = JudgedError["severity"];
@@ -125,7 +126,7 @@ const useDismiss = (open: boolean, close: () => void) => {
 const markQuotes = (root: HTMLElement, flags: ReadonlyArray<JudgedError>): Array<Array<HTMLElement>> =>
   flags.map((flag, i) => {
     const marks: Array<HTMLElement> = [];
-    for (const quote of flag.quotes ?? []) {
+    for (const [qi, quote] of (flag.quotes ?? []).entries()) {
       const q = quote.text;
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       const matches: Array<{ node: Text; at: number }> = [];
@@ -142,6 +143,7 @@ const markQuotes = (root: HTMLElement, flags: ReadonlyArray<JudgedError>): Array
         range.setEnd(node, at + q.length);
         const mark = document.createElement("mark");
         mark.className = `flag ${flag.severity}`;
+        mark.dataset.quote = String(qi);
         range.surroundContents(mark);
         marks.push(mark);
         const block = mark.closest("table") ?? mark.closest(BLOCKS) ?? mark;
@@ -237,14 +239,19 @@ const FlagCard = ({
   flag,
   n,
   marks,
+  onLocate,
 }: {
   readonly flag: JudgedError;
   readonly n: number;
   readonly marks: ReadonlyArray<HTMLElement>;
+  /** Shows the excerpt with this index in `flag.quotes` on the original page. */
+  readonly onLocate: (quote: number) => void;
 }) => {
   const [next, setNext] = useState(0);
   const jump = () => {
-    marks[next % marks.length]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const mark = marks[next % marks.length];
+    mark?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (mark !== undefined) onLocate(Number(mark.dataset.quote));
     setNext(next + 1);
   };
   return (
@@ -358,10 +365,12 @@ const Issues = ({
   parse,
   flags,
   found,
+  onLocate,
 }: {
   readonly parse: PageParse;
   readonly flags: ReadonlyArray<JudgedError>;
   readonly found: ReadonlyArray<ReadonlyArray<HTMLElement>>;
+  readonly onLocate: (flag: number, quote: number) => void;
 }) => {
   const [open, setOpen] = useState(false);
   const close = useMemo(() => () => setOpen(false), []);
@@ -401,7 +410,13 @@ const Issues = ({
           ) : (
             <div className="flag-list">
               {flags.map((flag, i) => (
-                <FlagCard key={`${flag.category}:${flag.description}`} flag={flag} n={i + 1} marks={found[i] ?? []} />
+                <FlagCard
+                  key={`${flag.category}:${flag.description}`}
+                  flag={flag}
+                  n={i + 1}
+                  marks={found[i] ?? []}
+                  onLocate={(quote) => onLocate(i, quote)}
+                />
               ))}
             </div>
           )}
@@ -417,6 +432,7 @@ const Column = ({
   best,
   menu,
   focus,
+  onLocate,
 }: {
   readonly column: number;
   readonly parse: PageParse;
@@ -424,13 +440,19 @@ const Column = ({
   readonly menu: React.ReactNode;
   /** Index of a flag to scroll to when the column opens. */
   readonly focus: number | null;
+  readonly onLocate: (flag: number, quote: number) => void;
 }) => {
   const flags = useMemo(() => flagsOf(parse), [parse]);
   const [found, setFound] = useState<Array<Array<HTMLElement>>>([]);
+  const locate = useRef(onLocate);
+  locate.current = onLocate;
   useEffect(() => {
-    const marks = focus === null ? undefined : found[focus];
-    if (marks === undefined || marks.length === 0) return;
-    marks[0]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (focus === null) return;
+    const marks = found[focus];
+    // No mark when the flag has no excerpt (missing content) or another flag's mark split it: locate its first excerpt anyway.
+    locate.current(focus, Number(marks?.[0]?.dataset.quote ?? 0));
+    if (marks === undefined || marks[0] === undefined) return;
+    marks[0].scrollIntoView({ behavior: "smooth", block: "center" });
     for (const mark of marks) mark.classList.add("pulse");
     const timer = setTimeout(() => {
       for (const mark of marks) mark.classList.remove("pulse");
@@ -444,7 +466,7 @@ const Column = ({
           <div style={{ flex: 1, minWidth: 0 }}>{menu}</div>
           <Score score={parse.score} best={best} />
         </div>
-        <Issues parse={parse} flags={flags} found={found} />
+        <Issues parse={parse} flags={flags} found={found} onLocate={onLocate} />
       </div>
       {parse.status === "succeeded" && parse.markdown !== null && (
         <div className="pc-col-body">
@@ -666,6 +688,23 @@ export const PageCompare = ({
   const [focus, setFocus] = useState<{ readonly presetId: string; readonly flag: number } | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new page clears the focused flag.
   useEffect(() => setFocus(null), [pageId]);
+  const [onPage, setOnPage] = useState<PageFocus | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new page clears the boxes on the original.
+  useEffect(() => setOnPage(null), [pageId]);
+  /** Outlines an excerpt on the original page with the parse's own boxes, or another parse's when it has none there. */
+  const locate = useCallback(
+    (presetId: string, flag: number, quote: number) => {
+      const own = detail?.parses.find((p) => p.presetId === presetId);
+      const q = own === undefined ? undefined : flagsOf(own)[flag]?.quotes?.[quote];
+      if (detail === null || own === undefined || q === undefined) return setOnPage(null);
+      for (const parse of [own, ...detail.parses.filter((p) => p !== own)]) {
+        const rects = parse.boxes === null ? [] : boxesFor(parse.boxes, q.text, q.occurrence);
+        if (rects.length > 0) return setOnPage({ rects, at: Date.now() });
+      }
+      setOnPage(null);
+    },
+    [detail],
+  );
 
   const stats = useMemo(() => (run === null ? [] : pageStats(run)), [run]);
   const position = stats.findIndex((p) => p.id === pageId);
@@ -825,7 +864,12 @@ export const PageCompare = ({
               <div className="eyebrow">Original</div>
               <ZoomControls zoom={zoom.zoom} onZoom={zoom.setZoom} />
             </div>
-            <ZoomImage src={current.imageUrl} alt={`${current.filename}, page ${current.index + 1}`} state={zoom} />
+            <ZoomImage
+              src={current.imageUrl}
+              alt={`${current.filename}, page ${current.index + 1}`}
+              state={zoom}
+              focus={onPage}
+            />
           </div>
         </aside>
         {detail === null && <p style={{ padding: 24 }}>Loading…</p>}
@@ -844,6 +888,7 @@ export const PageCompare = ({
                   key={parse.presetId}
                   column={slot}
                   focus={focus?.presetId === parse.presetId ? focus.flag : null}
+                  onLocate={(flag, quote) => locate(parse.presetId, flag, quote)}
                   parse={parse}
                   best={parse.score === best}
                   menu={

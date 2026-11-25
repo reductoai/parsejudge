@@ -1,3 +1,4 @@
+import type { Rect } from "@parsejudge/core/boxes";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./ax/Icon.tsx";
 
@@ -7,6 +8,24 @@ const ZOOM_STEP = 0.25;
 const ZOOM_PRESETS = [8, 6, 4, 3, 2, 1.5];
 
 const clamp = (zoom: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+const FOCUS_MAX_ZOOM = 4;
+
+/** Boxes to outline on the page; a new `at` zooms and scrolls to them again. */
+export interface PageFocus {
+  readonly rects: ReadonlyArray<Rect>;
+  readonly at: number;
+}
+
+const bounds = (rects: ReadonlyArray<Rect>): Rect => {
+  const left = Math.min(...rects.map((r) => r.left));
+  const top = Math.min(...rects.map((r) => r.top));
+  return {
+    left,
+    top,
+    width: Math.max(...rects.map((r) => r.left + r.width)) - left,
+    height: Math.max(...rects.map((r) => r.top + r.height)) - top,
+  };
+};
 
 /** − / percent menu / + controls, the same steps and presets as Studio's document viewer. */
 export const ZoomControls = ({ zoom, onZoom }: { readonly zoom: number; readonly onZoom: (zoom: number) => void }) => {
@@ -87,15 +106,17 @@ export const useZoom = () => {
   return useMemo(() => ({ viewport, zoom, zoomRef, setZoom }), [zoom, setZoom]);
 };
 
-/** An image in a scrollable viewport: zoom from the controls or by pinching, drag to pan. */
+/** An image in a scrollable viewport: zoom from the controls or by pinching, drag to pan. `focus` outlines boxes and zooms to them. */
 export const ZoomImage = ({
   src,
   alt,
   state: { viewport, zoom, zoomRef, setZoom },
+  focus = null,
 }: {
   readonly src: string;
   readonly alt: string;
   readonly state: ReturnType<typeof useZoom>;
+  readonly focus?: PageFocus | null;
 }) => {
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -120,6 +141,29 @@ export const ZoomImage = ({
     if (el === null || src === "") return;
     el.scrollTo({ left: 0, top: 0 });
   }, [src, viewport]);
+
+  // Zoom until the boxes fill about half the viewport, then center them once the new zoom is laid out.
+  useEffect(() => {
+    const el = viewport.current;
+    const img = el?.querySelector("img");
+    if (el === null || img == null || focus === null || focus.rects.length === 0) return;
+    const box = bounds(focus.rects);
+    const aspect = img.naturalWidth > 0 ? img.naturalHeight / img.naturalWidth : 1.3;
+    const fit = Math.min(0.6 / box.width, (0.5 * el.clientHeight) / (box.height * el.clientWidth * aspect));
+    setZoom(Math.min(FOCUS_MAX_ZOOM, Math.max(1, fit)));
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const view = el.getBoundingClientRect();
+        const page = img.getBoundingClientRect();
+        el.scrollTo({
+          left: el.scrollLeft + page.left - view.left + (box.left + box.width / 2) * page.width - el.clientWidth / 2,
+          top: el.scrollTop + page.top - view.top + (box.top + box.height / 2) * page.height - el.clientHeight / 2,
+          behavior: "smooth",
+        });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focus, viewport, setZoom]);
 
   return (
     <div
@@ -149,7 +193,21 @@ export const ZoomImage = ({
         setDragging(false);
       }}
     >
-      <img src={src} alt={alt} draggable={false} style={{ width: `${zoom * 100}%` }} />
+      <div className="zoom-page" style={{ width: `${zoom * 100}%` }}>
+        <img src={src} alt={alt} draggable={false} />
+        {focus?.rects.map((r) => (
+          <div
+            key={`${r.left},${r.top}`}
+            className="source-box"
+            style={{
+              left: `calc(${r.left * 100}% - 2px)`,
+              top: `calc(${r.top * 100}% - 2px)`,
+              width: `calc(${r.width * 100}% + 4px)`,
+              height: `calc(${r.height * 100}% + 4px)`,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 };

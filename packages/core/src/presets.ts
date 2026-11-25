@@ -45,7 +45,7 @@ const BUILTIN_PRESETS: ReadonlyArray<Preset> = [
     provider: "reducto",
     label: "Reducto r-1",
     mode: "r-1",
-    config: { formatting: { merge_tables: false }, settings: { model: "r-1" } },
+    config: { formatting: { merge_tables: false }, settings: { model: "r-1", return_citations: true } },
     listPriceUsdPerPage: 0.01,
     hosted: true,
   },
