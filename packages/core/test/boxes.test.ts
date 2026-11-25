@@ -34,6 +34,9 @@ describe("boxesFor", () => {
       { left: 0.1, top: 0.5, width: 0.08, height: 0.02 },
     ]);
   });
+  it("falls back to a case-insensitive match when the excerpt differs only in case", () => {
+    expect(boxesFor([word("Total", 0.1, 0.5)], "TOTAL", 1)).toHaveLength(1);
+  });
   it("finds nothing for text that is not on the page", () => {
     expect(boxesFor(page, "Pay $5", 1)).toEqual([]);
     expect(boxesFor(page, "  ", 1)).toEqual([]);

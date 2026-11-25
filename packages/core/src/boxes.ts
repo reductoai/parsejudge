@@ -13,7 +13,7 @@ export interface SourceBox extends Rect {
 
 /**
  * Text with tags, whitespace and Markdown syntax removed, so an excerpt of the rendered output matches the cited words.
- * Case is kept: the locate step counts `occurrence` over exact matches.
+ * Case is kept where it matches: the locate step counts `occurrence` over exact matches.
  */
 const squash = (text: string) => text.replace(/<[^>]*>/g, "").replace(/[\s*_|#`]+/g, "");
 
@@ -35,7 +35,7 @@ const union = (a: Rect, b: Rect): Rect => {
 
 /**
  * The boxes on the page around an excerpt of the output: the `occurrence`-th match (1-based) of `quote` in the boxes'
- * text, or the last match when there are fewer. Words on one line merge into one box. Empty when nothing matches.
+ * text (case-insensitive when no exact match), or the last match when there are fewer. Words on one line merge into one box. Empty when nothing matches.
  */
 export const boxesFor = (boxes: ReadonlyArray<SourceBox>, quote: string, occurrence: number): ReadonlyArray<Rect> => {
   const q = squash(quote);
@@ -48,8 +48,14 @@ export const boxesFor = (boxes: ReadonlyArray<SourceBox>, quote: string, occurre
     spans.push({ start: joined.length, end: joined.length + text.length, box });
     joined += text;
   }
-  const hits: Array<number> = [];
-  for (let at = joined.indexOf(q); at !== -1; at = joined.indexOf(q, at + 1)) hits.push(at);
+  const find = (text: string, part: string) => {
+    const found: Array<number> = [];
+    for (let at = text.indexOf(part); at !== -1; at = text.indexOf(part, at + 1)) found.push(at);
+    return found;
+  };
+  // Another parser may differ only in case (the error itself), so fall back to a case-insensitive match.
+  const exact = find(joined, q);
+  const hits = exact.length > 0 ? exact : find(joined.toLowerCase(), q.toLowerCase());
   const at = hits[Math.max(1, Math.min(occurrence, hits.length)) - 1];
   if (at === undefined) return [];
   const rects: Array<Rect> = [];
