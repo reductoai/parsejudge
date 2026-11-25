@@ -11,12 +11,11 @@ export interface SourceBox extends Rect {
   readonly text: string;
 }
 
-/** Text with tags, whitespace and Markdown syntax removed, so an excerpt of the rendered output matches the cited words. */
-const squash = (text: string) =>
-  text
-    .replace(/<[^>]*>/g, "")
-    .replace(/[\s*_|#`]+/g, "")
-    .toLowerCase();
+/**
+ * Text with tags, whitespace and Markdown syntax removed, so an excerpt of the rendered output matches the cited words.
+ * Case is kept: the locate step counts `occurrence` over exact matches.
+ */
+const squash = (text: string) => text.replace(/<[^>]*>/g, "").replace(/[\s*_|#`]+/g, "");
 
 const sameLine = (a: Rect, b: Rect) => {
   const overlap = Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top);
