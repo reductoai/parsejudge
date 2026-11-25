@@ -29,6 +29,11 @@ describe("boxesFor", () => {
   it("matches rendered text against cited text with Markdown or HTML around it", () => {
     expect(boxesFor([word("<b>Filing</b>", 0.1, 0.1), word("**Status**", 0.2, 0.1)], "Filing Status", 1)).toHaveLength(1);
   });
+  it("counts occurrences case-sensitively, like the locate step", () => {
+    expect(boxesFor([word("TOTAL", 0.1, 0.1), word("Total", 0.1, 0.5)], "Total", 1)).toEqual([
+      { left: 0.1, top: 0.5, width: 0.08, height: 0.02 },
+    ]);
+  });
   it("finds nothing for text that is not on the page", () => {
     expect(boxesFor(page, "Pay $5", 1)).toEqual([]);
     expect(boxesFor(page, "  ", 1)).toEqual([]);
