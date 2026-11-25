@@ -447,10 +447,12 @@ const Column = ({
   const locate = useRef(onLocate);
   locate.current = onLocate;
   useEffect(() => {
-    const marks = focus === null ? undefined : found[focus];
-    if (focus === null || marks === undefined || marks[0] === undefined) return;
+    if (focus === null) return;
+    const marks = found[focus];
+    // No mark when the flag has no excerpt (missing content) or another flag's mark split it: locate its first excerpt anyway.
+    locate.current(focus, Number(marks?.[0]?.dataset.quote ?? 0));
+    if (marks === undefined || marks[0] === undefined) return;
     marks[0].scrollIntoView({ behavior: "smooth", block: "center" });
-    locate.current(focus, Number(marks[0].dataset.quote));
     for (const mark of marks) mark.classList.add("pulse");
     const timer = setTimeout(() => {
       for (const mark of marks) mark.classList.remove("pulse");
