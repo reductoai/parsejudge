@@ -94,6 +94,49 @@ describe("provider adapters", () => {
     if (Exit.isFailure(exit)) throw new Error(String(exit.cause));
     expect(Option.getOrThrow(exit.value).markdown).toBe("# A\n\nB");
   });
+  it("keep the chunks behind a Reducto result URL in raw, so its boxes outlive the URL", async () => {
+    const chunks = [{ content: "A", blocks: [{ content: "A", bbox: { left: 0.1, top: 0.2, width: 0.3, height: 0.4 } }] }];
+    const exit = await run(
+      PROVIDERS.reducto.poll?.("job-1", credentials) ?? Effect.die("no poll"),
+      (() => {
+        let calls = 0;
+        return () =>
+          new Response(
+            JSON.stringify(
+              calls++ === 0 ? { status: "Completed", result: { result: { type: "url", url: "https://chunks.test/c" } } } : chunks,
+            ),
+          );
+      })(),
+    );
+    if (Exit.isFailure(exit)) throw new Error(String(exit.cause));
+    const output = Option.getOrThrow(exit.value);
+    expect(output.markdown).toBe("A");
+    expect(PROVIDERS.reducto.boxes?.(output.raw)).toEqual([{ text: "A", left: 0.1, top: 0.2, width: 0.3, height: 0.4 }]);
+  });
+  it("read Reducto's cited words as boxes, and a block's own box when it has no citations", () => {
+    const word = (text: string, left: number) => ({ text, bbox: { left, top: 0.5, width: 0.05, height: 0.01, page: 1 } });
+    const raw = {
+      result: {
+        chunks: [
+          {
+            blocks: [
+              {
+                content: "<b>Total</b> $3",
+                bbox: { left: 0, top: 0, width: 1, height: 1 },
+                extra: { word_citations: [word("Total", 0.1), word("$3", 0.2)] },
+              },
+              { type: "Figure", content: "A chart", bbox: { left: 0.1, top: 0.6, width: 0.8, height: 0.3 } },
+            ],
+          },
+        ],
+      },
+    };
+    expect(PROVIDERS.reducto.boxes?.(raw)).toEqual([
+      { text: "Total", left: 0.1, top: 0.5, width: 0.05, height: 0.01 },
+      { text: "$3", left: 0.2, top: 0.5, width: 0.05, height: 0.01 },
+      { text: "A chart", left: 0.1, top: 0.6, width: 0.8, height: 0.3 },
+    ]);
+  });
   it("keep Cohere output cut off at MAX_TOKENS, with a warning (recorded W-9 response)", async () => {
     const recorded = JSON.parse(readFileSync(new URL("fixtures/responses/cohere-max-tokens.json", import.meta.url), "utf8"));
     const exit = await run(PROVIDERS.cohere.submit(page, {}, credentials), json(recorded));

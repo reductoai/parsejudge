@@ -1,3 +1,5 @@
+import type { SourceBox } from "@parsejudge/core/boxes";
+
 export interface Preset {
   readonly id: string;
   readonly provider: string;
@@ -93,6 +95,8 @@ export interface PageParse {
   readonly score: number | null;
   readonly reasoning: string | null;
   readonly errors: ReadonlyArray<JudgedError> | null;
+  /** The output's text with its boxes on the page, for providers that return them. */
+  readonly boxes: ReadonlyArray<SourceBox> | null;
 }
 
 export interface PageDetail {

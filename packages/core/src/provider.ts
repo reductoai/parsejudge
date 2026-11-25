@@ -1,5 +1,6 @@
 import { Effect, type Option } from "effect";
 import type { HttpClient } from "effect/http";
+import type { SourceBox } from "./boxes.ts";
 import type { Cost } from "./domain.ts";
 import { ProviderError } from "./errors.ts";
 
@@ -47,6 +48,8 @@ export interface ProviderAdapter {
     job: string,
     credentials: Credentials,
   ) => Effect.Effect<Option.Option<ParseOutput>, ProviderError, HttpClient.HttpClient>;
+  /** The output's text with its boxes on the page, read from a stored `raw`. Absent when the provider returns no boxes. */
+  readonly boxes?: (raw: unknown) => ReadonlyArray<SourceBox>;
 }
 
 export const credential = (provider: string, credentials: Credentials, key: string) => {
